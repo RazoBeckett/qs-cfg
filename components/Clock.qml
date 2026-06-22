@@ -4,7 +4,7 @@ import QtQuick
 
 Text {
   text: Qt.formatDateTime(clock.date, "hh:mm")
-  color: '#c8d3f5'
+  color: Colors.foreground
   font: Config.font
 
   SystemClock { 
