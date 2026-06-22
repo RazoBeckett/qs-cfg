@@ -11,11 +11,11 @@ ShellRoot {
       right: true
     }
     implicitHeight: Config.height
-    // color: "transparent"
-    color: "transparent"
+    color: Colors.transparent
 
     RowLayout {
       anchors.fill: parent
+      spacing: Config.spacing
       anchors.leftMargin: Config.margin
       anchors.rightMargin: Config.margin
 
