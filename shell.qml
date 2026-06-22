@@ -15,7 +15,6 @@ ShellRoot {
 
     RowLayout {
       anchors.fill: parent
-      spacing: Config.spacing
       anchors.leftMargin: Config.margin
       anchors.rightMargin: Config.margin
 
@@ -23,13 +22,13 @@ ShellRoot {
 
       Item { Layout.fillWidth: true }
 
-      Volume {}
-
-      Network {}
-
-      Battery {}
-
-      Clock {}
+      RowLayout {
+        spacing: Config.spacing
+        Volume {}
+        Network {}
+        Battery {}
+        Clock {}
+      }
     }
   }
 }
