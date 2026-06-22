@@ -10,18 +10,24 @@ ShellRoot {
       left: true
       right: true
     }
-    implicitHeight: 30
+    implicitHeight: Config.height
     // color: "transparent"
-    color: Colors.background
+    color: "transparent"
 
     RowLayout {
       anchors.fill: parent
-      anchors.leftMargin: 14
-      anchors.rightMargin: 14
+      anchors.leftMargin: Config.margin
+      anchors.rightMargin: Config.margin
 
       Workspaces {}
 
       Item { Layout.fillWidth: true }
+
+      Volume {}
+
+      Network {}
+
+      Battery {}
 
       Clock {}
     }
