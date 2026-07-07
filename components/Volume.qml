@@ -42,6 +42,23 @@ RowLayout {
     font: Config.font
   }
 
+  function adjustVolume(delta) {
+    if (!root.ready) return
+    var next = Math.min(1.0, Math.max(0.0, root.sink.audio.volume + delta / 100))
+    root.sink.audio.volume = next
+  }
+
+  MouseArea {
+    anchors.fill: parent
+    acceptedButtons: Qt.NoButton
+    onWheel: wheel => {
+      if (wheel.angleDelta.y > 0) root.adjustVolume(5)
+      else if (wheel.angleDelta.y < 0) root.adjustVolume(-5)
+    }
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
+  }
+
   PwObjectTracker {
     objects: [root.sink]
   }

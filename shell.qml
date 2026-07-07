@@ -24,6 +24,7 @@ ShellRoot {
 
       RowLayout {
         spacing: Config.spacing
+        Brightness {}
         Volume {}
         Network {}
         Battery {}
