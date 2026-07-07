@@ -1,11 +1,14 @@
 import ".."
 import Quickshell.Services.Pipewire
+import Quickshell.Widgets
 import QtQuick
 import QtQuick.Layouts
 
-RowLayout {
+WrapperMouseArea {
   id: root
-  spacing: 6
+  acceptedButtons: Qt.NoButton
+  hoverEnabled: true
+  cursorShape: Qt.PointingHandCursor
 
   property var sink: Pipewire.defaultAudioSink
 
@@ -24,22 +27,26 @@ RowLayout {
     return String.fromCodePoint(0xF057E)
   }
 
-  Text {
-    text: root.icon
-    color: Colors.yellow
-    font: Config.iconFont
-  }
+  child: RowLayout {
+    spacing: 6
 
-  Text {
-    text: {
-      if(!root.ready) return "-"
-      if(root.muted) return "Muted"
-      return root.vol + "%"
+    Text {
+      text: root.icon
+      color: Colors.yellow
+      font: Config.iconFont
     }
 
-    color: root.muted ? Colors.white : Colors.foreground
+    Text {
+      text: {
+        if(!root.ready) return "-"
+        if(root.muted) return "Muted"
+        return root.vol + "%"
+      }
 
-    font: Config.font
+      color: root.muted ? Colors.white : Colors.foreground
+
+      font: Config.font
+    }
   }
 
   function adjustVolume(delta) {
@@ -48,15 +55,9 @@ RowLayout {
     root.sink.audio.volume = next
   }
 
-  MouseArea {
-    anchors.fill: parent
-    acceptedButtons: Qt.NoButton
-    onWheel: wheel => {
-      if (wheel.angleDelta.y > 0) root.adjustVolume(5)
-      else if (wheel.angleDelta.y < 0) root.adjustVolume(-5)
-    }
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
+  onWheel: wheel => {
+    if (wheel.angleDelta.y > 0) root.adjustVolume(5)
+    else if (wheel.angleDelta.y < 0) root.adjustVolume(-5)
   }
 
   PwObjectTracker {

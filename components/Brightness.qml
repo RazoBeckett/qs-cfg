@@ -1,12 +1,15 @@
 import ".."
 import Quickshell
 import Quickshell.Io
+import Quickshell.Widgets
 import QtQuick
 import QtQuick.Layouts
 
-RowLayout {
+WrapperMouseArea {
   id: root
-  spacing: 6
+  acceptedButtons: Qt.NoButton
+  hoverEnabled: true
+  cursorShape: Qt.PointingHandCursor
 
   // sysfs backlight device name under /sys/class/backlight/
   property string device: "intel_backlight"
@@ -23,18 +26,22 @@ RowLayout {
   readonly property int moonIndex: Math.min(14, Math.max(0, Math.round((root.level / 100) * 14)))
   readonly property string icon: String.fromCodePoint(0xe38d + root.moonIndex)
 
-  Text {
-    text: root.icon
-    color: Colors.yellow
-    font: Config.iconFont
-  }
+  child: RowLayout {
+    spacing: 6
 
-  Text {
-    text: root.ready ? root.level + "%" : "-"
+    Text {
+      text: root.icon
+      color: Colors.yellow
+      font: Config.iconFont
+    }
 
-    color: Colors.foreground
+    Text {
+      text: root.ready ? root.level + "%" : "-"
 
-    font: Config.font
+      color: Colors.foreground
+
+      font: Config.font
+    }
   }
 
   function adjustBrightness(delta) {
@@ -46,15 +53,9 @@ RowLayout {
     Quickshell.execDetached(["brightnessctl", "set", `${Math.abs(delta)}%${sign}`])
   }
 
-  MouseArea {
-    anchors.fill: parent
-    acceptedButtons: Qt.NoButton
-    onWheel: wheel => {
-      if (wheel.angleDelta.y > 0) root.adjustBrightness(5)
-      else if (wheel.angleDelta.y < 0) root.adjustBrightness(-5)
-    }
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
+  onWheel: wheel => {
+    if (wheel.angleDelta.y > 0) root.adjustBrightness(5)
+    else if (wheel.angleDelta.y < 0) root.adjustBrightness(-5)
   }
 
   FileView {
