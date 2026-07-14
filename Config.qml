@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-  readonly property int margin: 12
+  readonly property int margin: 6
   readonly property int height: 30
   readonly property int spacing: 20
 
