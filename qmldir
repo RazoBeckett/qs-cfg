@@ -1,5 +1,7 @@
 Brightness 1.0 Brightness.qml
 Clock 1.0 Clock.qml
+singleton NetworkMenuState 1.0 NetworkMenuState.qml
 Workspaces 1.0 Workspaces.qml
 singleton Colors 1.0 Colors.qml
 singleton Config 1.0 Config.qml
+HoldCard 1.0 components/HoldCard.qml

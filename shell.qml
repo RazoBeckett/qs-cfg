@@ -4,6 +4,8 @@ import QtQuick
 import QtQuick.Layouts
 
 ShellRoot {
+  NetworkHub {}
+
   PanelWindow {
     anchors {
       top: true
