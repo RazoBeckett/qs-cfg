@@ -77,12 +77,13 @@ Item {
     { name: "UI", icon: "sliders-horizontal" },
     { name: "Wallpaper", icon: "image" },
     { name: "Fonts", icon: "text-aa" },
+    { name: "AI", icon: "robot" },
     { name: "About", icon: "info" }
   ]
 
   Shortcut {
     sequence: "Escape"
-    enabled: !wallpaperTab.editingDir && !fontsTab.editingFont && !fontsTab.editingMono
+    enabled: !wallpaperTab.editingDir && !fontsTab.editingFont && !fontsTab.editingMono && !aiTab.editingKey && !aiTab.editingLang
     onActivated: root.playClose()
   }
 
@@ -345,7 +346,8 @@ Item {
             UiTab { visible: root.currentTab === 0; Layout.fillWidth: true }
             WallpaperTab { id: wallpaperTab; visible: root.currentTab === 1; Layout.fillWidth: true }
             FontsTab { id: fontsTab; visible: root.currentTab === 2; Layout.fillWidth: true; commitDisplay: root.commitDisplay }
-            AboutTab { visible: root.currentTab === 3; Layout.fillWidth: true }
+            AITab { id: aiTab; visible: root.currentTab === 3; Layout.fillWidth: true }
+            AboutTab { visible: root.currentTab === 4; Layout.fillWidth: true }
 
             Item { Layout.fillHeight: true }
           }

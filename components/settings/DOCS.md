@@ -14,7 +14,7 @@ reads/writes the `Settings` singleton, which persists to `kettshell.json`.
   active-tab highlight.
 - `SettingsRow.qml` — one row: title plus subtitle on the left, a
   caller-supplied control in a 240px box on the right.
-- `UiTab.qml`, `WallpaperTab.qml`, `FontsTab.qml`, `AboutTab.qml` — the four pages.
+- `UiTab.qml`, `WallpaperTab.qml`, `FontsTab.qml`, `AITab.qml`, `AboutTab.qml` — the five pages.
 
 All seven types are registered in the root `qmldir`, and `shell.qml`
 instantiates `SettingsWindow {}` next to `Background`.
@@ -33,6 +33,12 @@ From `services/Settings.qml`:
 - `Settings.ui.fontFamily` (string, default "SF Pro Text")
 - `Settings.ui.fontScale` (real, default 13, feeds `Typography.rootSize`)
 - `Settings.ui.monoFamily` (string, default "JetBrains Mono")
+- `Settings.ai.deepgramKey` (string, default "")
+- `Settings.ai.model` (string, default "nova-3")
+- `Settings.ai.language` (string, default "en")
+- `Settings.ai.smartFormat` (bool, default true)
+- `Settings.ai.punctuate` (bool, default true)
+- `Settings.ai.autoCopy` (bool, default false)
 
 Writing any of these from QML saves `kettshell.json` automatically.
 
