@@ -15,6 +15,7 @@ Singleton {
 
   readonly property alias wallpaper: adapter.wallpaper
   readonly property alias ui: adapter.ui
+  readonly property alias ai: adapter.ai
 
   // Corner scale, derived from the saved value by φ. Lives outside the
   // adapter so it never leaks into kettshell.json.
@@ -49,6 +50,15 @@ Singleton {
         property string fontFamily: "SF Pro Text"
         property string monoFamily: "JetBrains Mono"
         property real fontScale: 13
+      }
+
+      property JsonObject ai: JsonObject {
+        property string deepgramKey: ""
+        property string model: "nova-3"
+        property string language: "en"
+        property bool smartFormat: true
+        property bool punctuate: true
+        property bool autoCopy: false
       }
     }
   }
