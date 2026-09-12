@@ -31,3 +31,4 @@ UiTab 1.0 components/settings/UiTab.qml
 WallpaperTab 1.0 components/settings/WallpaperTab.qml
 AboutTab 1.0 components/settings/AboutTab.qml
 FontsTab 1.0 components/settings/FontsTab.qml
+singleton Dictation 1.0 services/Dictation.qml
