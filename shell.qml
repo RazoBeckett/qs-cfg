@@ -54,6 +54,7 @@ Scope {
   Background {}
   WallpaperPicker { id: wallpaperPicker }
   SettingsWindow {}
+  DictationOsd {}
 
   Component.onCompleted: closePopouts()
 
