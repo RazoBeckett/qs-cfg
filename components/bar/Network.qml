@@ -18,7 +18,7 @@ WrapperMouseArea {
   readonly property bool disconnected: wifiOn && !active
   readonly property string icon: {
     if (!wifiOn) return "wifi-slash"
-    if (!active) return "wifi-none"
+    if (!active) return "wifi-x"
     let tier = signal >= 0.75 ? 4 : signal >= 0.50 ? 3 : signal >= 0.25 ? 2 : 1
     if (tier === 4) return "wifi-high"
     if (tier === 3) return "wifi-medium"
