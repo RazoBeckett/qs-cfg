@@ -1,92 +1,85 @@
 ---
 name: quickshell-ui
-description: Quickshell UI consistency via the phi rounding scale, card clipping, shared components, and type rules. Use when adding or changing any visible shell surface, adjusting corner radius or the rounding setting, adding shared components or settings rows, or touching fonts or text.
+description: Visual consistency for any Quickshell shell. Theme tokens, corner scale, typography, icons, clipping, shared components, empty states, and motion styling. Use when adding or changing any visible surface.
 ---
 
 # Quickshell UI
 
-Every visible surface follows one corner scale derived from a single saved value. Match the scale; never invent radii. Every text element follows the three type categories under Type. Style, imports, and naming follow CODING-STANDARDS.md. Settings rows and tabs follow components/settings/DOCS.md. Where those files conflict with this skill, they win.
+Generic visual rules for any Quickshell project. No project specific settings, paths, or font picks live here. Match the host theme instead of reusing example values.
+
+Use `quickshell` skill for surfaces, services, multimonitor scope, and run loop. Use this skill for what the eye sees.
 
 ## Steps
 
 Do these in order. Each step states how you know it is done.
 
-1. **Read the scale.** `Settings.ui.rounding` (int, default 5) is the only saved value. `Settings.rounding.{lg,md,sm,xs}` derive from it by phi (1.618): lg is the value, each step down divides by phi and rounds. At default 5 that is 5/3/2/1.
-   Done when you can name the four levels for the current setting without opening Settings.qml.
+1. **Read the host theme first.** Find where colors, type, spacing, and radii live, usually `theme/` singletons. Note the label font, mono font, and icon font actually installed.
+   Done when you can name the token files and the three font families without guessing.
 
-2. **Assign the level.** Lg for outer cards, popups, pills, and the settings shell. Md for one level in: tab highlights, device rows, stream cards, preview boxes, wallpaper thumbs, mid-size buttons. Sm for small controls: 28px icon buttons, preset chips, toggle thumbs, slider tracks. Xs for the tiniest outlines and dots.
-   Done when every `radius:` in touched files names a scale level and no literal remains.
+2. **Use one corner scale.** Pick four levels for outer shells, nested cards, small controls, and hairlines. Derive them from one base value so a restyle edits one place. Never write a literal radius at a call site.
+   Done when every `radius:` in touched files names the scale and zero stays zero at every level.
 
-3. **Clip what bleeds.** A container whose children reach its edges (images, sidebar fills, wipe previews) becomes `ClippingRectangle` with `contentUnderBorder: true`. Plain `Rectangle` + `clip: true` leaves square corners poking through rounded borders. Simple cards stay `Rectangle` with `radius` + `clip: true`.
-   Done when rounded containers show no square-corner poke at any rounding value including 0.
+3. **Clip what bleeds.** A container whose children reach its edges such as images, sidebar fills, or preview art becomes a clipping container that keeps rounded corners intact. Simple cards stay a plain shape with `clip: true`.
+   Done when rounded containers show no square corner poke at any scale value including 0.
 
-4. **Bind shared components once.** Toggle and Slider defaults come from the scale; delete per-call radius overrides except compact variants (stream thumbs pin Sm). New shared components take scale defaults the same way, so a rounding change propagates with no per-call edits.
-   Done when moving the slider in Settings UI restyles every touched surface live.
+4. **Set type by role.** Body and headings take the sans family. Clocks, percentages, and numeric columns take mono so characters align. Glyphs take the icon font only. Set family and pixel size from the theme and weight on the item. Never pair a grouped `font:` binding with a `font.*` override on the same item, since evaluation order clobbers it.
+   Done when every touched text follows the rule and weight matches place in hierarchy.
 
-5. **Set type by category.** Body and headings take the sans family, clocks and percentages take mono, glyphs take icons. Set family and pixelSize from Typography and weight on the item, never by overriding a bound grouped font. Prefer Label once it exists.
-   Done when every touched Text follows the override rule and its weight matches its place in the hierarchy.
+5. **Reuse shared components.** Buttons, sliders, toggles, labels, cards, and popups take scale defaults once. Delete per call radius overrides except named compact variants so a theme change propagates with no per call edits.
+   Done when a rounding or font change restyles every touched surface with no extra edits.
 
-6. **Verify.** `rg 'radius: 0'` over components/ is empty, no touched Text pairs `font: Typography.x` with a `font.*` override on the same item, `qs log` ends in Configuration Loaded, and kettshell.json still holds only its known keys under `ui`.
-   Done when all four hold.
+6. **Bound text you do not control.** Size pills and cards from content with `implicitWidth` and `implicitHeight`. Cap system or media text with `Layout.maximumWidth` plus `Text.ElideRight` so a long title never pushes other controls off screen. Give media, network, and hardware an explicit empty state. A blank element reads as broken.
+   Done when a 200 character label stays bounded and disconnected or missing hardware still renders clean.
+
+7. **Verify looks and motion.** Check contrast on small text, icon glyphs against the installed font release, entrance and exit motion, and all connected monitors.
+   Done when small text stays readable, glyphs match the font in use, transitions run smooth twice in a row, and per monitor windows hold.
 
 ## Reference
 
-### The scale
+### Theme tokens
 
-- lg: the saved value. Outer shells only.
-- md: value / phi. First nesting level.
-- sm: value / phi squared. Small controls.
-- xs: value / phi cubed. Hairlines and dots.
-- Zero stays zero at every level.
+One way flow. Config feeds theme, theme feeds interface. A component reads a token and never writes one, so a full restyle happens from one place.
 
-### Persistence guardrail
+- Colors for every background, foreground, border, and accent.
+- Type for sans, mono, and icon families plus the size ramp.
+- Spacing for bar height, outer margins, module gaps, and control padding.
+- Radii for the four corner levels.
 
-Declare derived values on the Settings root, beside the adapter, never inside the `ui` JsonObject. Every property inside that object is saved to kettshell.json and reloaded over its binding, so a derived value placed there freezes after one restart.
+Hard coded colors, font names, pixel sizes, or radii at call sites are defects. Move them into tokens.
 
-## Type
+### Type
 
-### Categories
-
-Three families, ever. Sans for nearly everything. Mono where characters must align: clocks, percentages, numeric columns. Icons for glyphs only, never mixed with text sizing logic. No serif; it reads traditional and has no place in a shell.
-
-### Singleton shape
-
-`theme/Typography.qml` holds one `readonly property font` per category, all `Font.Normal`:
-
-```qml
-readonly property font sans: Qt.font({
-  family: "SF Pro Text",
-  pixelSize: 13,
-  weight: Font.Normal
-})
-```
-
-Weight is a per-use override, never a separate property, so there is no `sansBold`. Size comes from the scale below, not the font object.
-
-### The override rule
-
-Binding a whole grouped `font` then overriding a sub-property gets clobbered by evaluation order. Pull the pieces individually and set weight on the item:
+Three families, ever. Sans for nearly everything. Mono where characters must align. Icons for glyphs only.
 
 ```qml
 Text {
-  font.family: Typography.sans.family
-  font.pixelSize: Typography.sans.pixelSize
-  font.weight: Font.Bold
+  font.family: Theme.sans.family
+  font.pixelSize: Theme.sans.pixelSize
+  font.weight: Font.DemiBold
 }
 ```
 
-Demand: every Text you touch sets its font pieces individually or uses Label. Never pair `font: Typography.x` with a `font.*` override on the same item.
+Headings and buttons take `Font.DemiBold` to `Font.Bold`. Body stays `Font.Normal`. Captions take `Font.Normal` or `Font.Medium`.
 
-### Weight and size
+### Icons
 
-Headings and buttons take `Font.DemiBold` to `Font.Bold`; body stays `Font.Normal`; captions take `Font.Normal` or `Font.Medium`. Mono usually offers only normal and bold. Sizes hang off one persisted base, `Settings.fontScale`, tuned in the Fonts tab: `sizeXS` is base * 0.85, `sizeSM` is base, `sizeMD` is base * 1.15, `sizeLG` is base * 1.4. Bigger text runs tighter leading and tracking; smaller text runs more generous.
+Two strategies, both valid. Ligatures use readable names such as `wifi` when the icon font supports them. Codepoints use `String.fromCodePoint(...)` so source never holds private use characters directly. Never paste raw glyphs into source.
 
-### Label
+Verify codepoints against the installed font release. Battery and wifi tiers often sit at consecutive codepoints with gaps and one off states apart, so sequential math plus direct addresses for outliers is the normal shape.
 
-`components/shared/Label.qml` sits beside Slider and Toggle and exposes `useMono`, `size`, and `weight`, assembling the font internally so call sites shrink to one or two lines. The source of truth stays in Typography.
+### Shared component shape
 
-### Picks and contrast
+Inputs first, drawing second. Name the properties a caller controls such as `icon`, `label`, `iconColor`, `maxLabelWidth`, and `active` before drawing anything. Keep `Process`, `Timer`, and service objects out of the visual file. Every value shown comes from a declared property.
 
-Sans is SF Pro Text, mono defaults to JetBrains Mono (JetBrains Mono and IBM Plex Mono are both freely redistributable; SF Mono licensing excludes non-Apple apps), both user-overridable from the Fonts tab, icons stay Phosphor. Small text holds 7:1 contrast against its background. Treat a new color in Colors.qml and a new size in Typography.qml as one paired decision, not two.
+### Motion styling
 
+Animate one number from 0 to 1 and derive position, radius, and opacity from it with arithmetic. Attach one `Behavior` with a `NumberAnimation` to that driver. Multiple behaviors on dependent properties chase each other and freeze then lurch.
 
+Keep idle hidden items a hair above zero opacity so the renderer stays warm. Fully transparent items build their first frame during the fade, so entrances stutter while exits look fine.
+
+### Reference links
+
+- [Quickshell introduction](https://quickshell.org/docs/v0.3.1/guide/introduction/)
+- [Type reference](https://quickshell.org/docs/v0.3.1/types/)
+- [Qt QML documents](https://doc.qt.io/qt-6/qtqml-documents-topic.html)
+- [Qt item size and positioning](https://doc.qt.io/qt-6/qtquick-positioning.html)
