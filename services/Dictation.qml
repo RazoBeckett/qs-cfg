@@ -21,6 +21,7 @@ Singleton {
   readonly property real peak: peakMonitor.peak
   readonly property string audioPath: Quickshell.cachePath("dictate.raw")
 
+  // mip_opt_out keeps audio out of training, retained only to process.
   readonly property string listenUrl: {
     const params = [
       "model=" + encodeURIComponent(Settings.ai.model),
@@ -29,7 +30,8 @@ Singleton {
       "channels=1",
       "smart_format=" + Settings.ai.smartFormat,
       "punctuate=" + Settings.ai.punctuate,
-      "language=" + encodeURIComponent(Settings.ai.language)
+      "language=" + encodeURIComponent(Settings.ai.language),
+      "mip_opt_out=true"
     ]
     return "https://api.deepgram.com/v1/listen?" + params.join("&")
   }
