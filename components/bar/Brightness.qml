@@ -12,6 +12,7 @@ WrapperMouseArea {
   cursorShape: Qt.PointingHandCursor
 
   property var shell: null
+  property var barWindow: null
 
   property string device: "intel_backlight"
   readonly property string dir: `/sys/class/backlight/${device}`
@@ -24,6 +25,8 @@ WrapperMouseArea {
     if (level <= 33) return "sun-dim"
     return "sun"
   }
+  readonly property string tipText: root.ready ? root.level + "%" : "-"
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
     implicitWidth: row.implicitWidth + 26
@@ -40,12 +43,6 @@ WrapperMouseArea {
         color: Colors.foreground
         font.family: Typography.icons.family
         font.pixelSize: 14
-      }
-
-      Label {
-        text: root.ready ? root.level + "%" : "-"
-        color: Colors.foreground
-        weight: Font.Bold
       }
     }
   }
@@ -77,5 +74,13 @@ WrapperMouseArea {
   FileView {
     id: maxBrightness
     path: `${root.dir}/max_brightness`
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
+    useMono: true
   }
 }

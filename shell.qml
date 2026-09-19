@@ -105,20 +105,25 @@ Scope {
               Brightness {
                 id: brightnessPill
                 shell: root
+                barWindow: barWindow
               }
               Volume {
                 id: volumePill
                 shell: root
+                barWindow: barWindow
               }
               Network {
                 id: networkPill
                 shell: root
+                barWindow: barWindow
               }
               Battery {
                 id: batteryPill
                 shell: root
               }
-              Clock {}
+              Clock {
+                barWindow: barWindow
+              }
             }
           }
         }

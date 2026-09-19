@@ -11,6 +11,7 @@ WrapperMouseArea {
   acceptedButtons: Qt.LeftButton | Qt.RightButton
 
   property var shell: null
+  property var barWindow: null
   property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
   property var active: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
   readonly property real signal: active ? active.signalStrength : 0
@@ -25,11 +26,12 @@ WrapperMouseArea {
     if (tier === 2) return "wifi-low"
     return "wifi-none"
   }
-  readonly property string label: {
-    if (!wifiOn) return "OFF"
-    if (active) return active.name
+  readonly property string tipText: {
+    if (!root.wifiOn) return "OFF"
+    if (root.active) return root.active.name
     return "Disconnected"
   }
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
     implicitWidth: row.implicitWidth + 26
@@ -46,14 +48,6 @@ WrapperMouseArea {
         color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
         font.family: Typography.icons.family
         font.pixelSize: 14
-      }
-
-      Label {
-        text: root.label
-        color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
-        weight: Font.Bold
-        elide: Text.ElideRight
-        Layout.maximumWidth: 140
       }
     }
   }
@@ -78,5 +72,12 @@ WrapperMouseArea {
   onClicked: mouse => {
     if (mouse.button === Qt.RightButton) root.togglePopout("bluetooth")
     else if (mouse.button === Qt.LeftButton) root.togglePopout("wifi")
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
   }
 }

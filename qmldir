@@ -22,6 +22,7 @@ Slider 1.0 components/shared/Slider.qml
 Label 1.0 components/shared/Label.qml
 PressableItem 1.0 components/shared/PressableItem.qml
 ObsMeter 1.0 components/shared/ObsMeter.qml
+Tooltip 1.0 components/shared/Tooltip.qml
 WallpaperPicker 1.0 components/wallpaper/WallpaperPicker.qml
 WallpaperItem 1.0 components/wallpaper/WallpaperItem.qml
 SettingsWindow 1.0 components/settings/SettingsWindow.qml

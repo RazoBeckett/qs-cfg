@@ -9,6 +9,11 @@ Item {
   implicitHeight: Sizing.barHeight
 
   property string displayText: Qt.formatDateTime(clock.date, "hh:mm")
+  property var barWindow: null
+
+  readonly property string tipText: Qt.formatDateTime(clock.date, "hh:mm:ss") + "\n" + Qt.formatDateTime(clock.date, "MMM d, yyyy")
+
+  HoverHandler { id: hover }
 
   RowLayout {
     id: row
@@ -79,6 +84,14 @@ Item {
 
   SystemClock {
     id: clock
-    precision: SystemClock.Minutes
+    precision: SystemClock.Seconds
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: hover.hovered && root.barWindow !== null
+    useMono: true
   }
 }

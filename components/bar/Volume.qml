@@ -11,6 +11,7 @@ WrapperMouseArea {
   cursorShape: Qt.PointingHandCursor
 
   property var shell: null
+  property var barWindow: null
 
   property var sink: Pipewire.defaultAudioSink
   readonly property bool ready: sink && sink.ready
@@ -22,6 +23,12 @@ WrapperMouseArea {
     if (vol < 34) return "speaker-low"
     return "speaker-high"
   }
+  readonly property string tipText: {
+    if (!root.ready) return "-"
+    if (root.muted) return "Muted"
+    return root.vol + "%"
+  }
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
     implicitWidth: row.implicitWidth + 26
@@ -38,16 +45,6 @@ WrapperMouseArea {
         color: Colors.foreground
         font.family: Typography.icons.family
         font.pixelSize: 14
-      }
-
-      Label {
-        text: {
-          if (!root.ready) return "-"
-          if (root.muted) return "00%"
-          return root.vol + "%"
-        }
-        color: Colors.foreground
-        weight: Font.Bold
       }
     }
   }
@@ -79,5 +76,13 @@ WrapperMouseArea {
 
   PwObjectTracker {
     objects: [root.sink]
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
+    useMono: true
   }
 }
