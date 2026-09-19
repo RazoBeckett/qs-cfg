@@ -2,7 +2,6 @@ import "../.."
 import Quickshell.Networking
 import Quickshell.Widgets
 import QtQuick
-import QtQuick.Layouts
 
 WrapperMouseArea {
   id: root
@@ -34,21 +33,16 @@ WrapperMouseArea {
   readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
-    implicitWidth: row.implicitWidth + 26
+    implicitWidth: Sizing.barHeight
     implicitHeight: Sizing.barHeight
     pressed: root.pressed
 
-    RowLayout {
-      id: row
+    Text {
       anchors.centerIn: parent
-      spacing: 6
-
-      Text {
-        text: root.icon
-        color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
-        font.family: Typography.icons.family
-        font.pixelSize: 14
-      }
+      text: root.icon
+      color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
+      font.family: Typography.icons.family
+      font.pixelSize: 15
     }
   }
 

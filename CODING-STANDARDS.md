@@ -57,6 +57,12 @@ declarative, and consistent with the existing bar components.
 - Use `RowLayout` for horizontal bar groups.
 - Use `Item { Layout.fillWidth: true }` as the flexible spacer between left and
   right bar regions.
+- Size icon-only bar pills as fixed squares (`Sizing.barHeight` by
+  `Sizing.barHeight`) with the glyph centered, never from glyph content
+  width. Glyph widths vary per icon, so content-sized pills drift and the
+  rhythm feels uneven. Text pills (battery, clock) stay content-sized.
+- Separate bar pills with `Sizing.moduleSpacing` (8). Do not invent local
+  gaps between pills.
 - Keep repeated inline spacing values small and local only when they are part of
   a component's internal visual rhythm.
 - Keep bar height, outer margins, fonts, and shared dimensions centralized in
@@ -71,10 +77,18 @@ declarative, and consistent with the existing bar components.
 - Add new colors to `theme/Colors.qml` before using them in multiple places.
 - Use `Typography.sans` / `Typography.mono` for text (via `Label` where possible).
 - Use `Typography.icons` for glyphs.
+- Draw bar status icons at 15px. Smaller glyphs read as extra vertical air
+  inside the 30px slot.
 - Use `String.fromCodePoint(...)` for icon glyphs instead of pasting private-use
   characters directly into source files.
 - Keep component text minimal and status-oriented: percentages, short labels,
   connection names, and fallback states such as `"-"` or `"Muted"`.
+- Reveal pill details on hover with the shared `Tooltip`, not inline text.
+  Icon-only pills expose `tipText`, `tipHovered`, and `barWindow`, and
+  `shell.qml` passes `barWindow` through. Tooltip behavior follows Astryx
+  (200ms hover intent, instant hide, no arrow); visuals stay on our tokens
+  (`Colors.black` surface, `Colors.foreground` text, `Colors.border`,
+  `Settings.rounding.sm`).
 - Use color to communicate state, but keep the foreground text color stable
   unless the state itself needs emphasis.
 - Use one corner scale. `Settings.ui.rounding` (int, 0-24, default 5) is the
@@ -176,11 +190,16 @@ When adding a new bar module:
 2. Import `".."` (or `"../.."` from a subfolder)
    so the component can use `Colors`, `Typography`, and `Settings`.
 3. Use a small root item such as `RowLayout`, `Text`, or `WrapperMouseArea`.
+   Icon-only pills use a fixed `Sizing.barHeight` square with a centered
+   glyph; text pills size from content.
 4. Define service bindings and derived `readonly property` values near the top.
 5. Render icon and text children with `Typography.icons` and `Typography.sans`/`Typography.mono` (or `Label`).
+   Icon-only pills show no inline text; they expose `tipText` and
+   `tipHovered` and render a `Tooltip` instead.
 6. Add fallback states for missing data.
 7. Add the component to `qmldir` if it should be imported by name.
-8. Compose it into `shell.qml` in the appropriate row.
+8. Compose it into `shell.qml` in the appropriate row, passing `barWindow`
+   when the module renders a `Tooltip` or `PopupCard`.
 
 For settings tabs and rows, follow `components/settings/DOCS.md` instead of
 this list. Editing an existing file hot reloads, while adding or renaming a

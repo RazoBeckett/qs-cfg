@@ -67,7 +67,7 @@ WrapperMouseArea {
         text: root.icon
         color: root.charging ? Colors.waybarCharging : root.critical ? Colors.foreground : Colors.foreground
         font.family: Typography.icons.family
-        font.pixelSize: 14
+        font.pixelSize: 15
       }
 
       Label {
