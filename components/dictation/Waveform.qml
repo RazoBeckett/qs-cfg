@@ -2,8 +2,10 @@ import "../.."
 import QtQuick
 
 /*
- * Symmetric voice waveform: 32 bars centered on the horizontal axis, full
- * bar height is the amplitude. Motion follows the neon-visualizer recipe
+ * Symmetric voice waveform: bars centered on the horizontal axis, full
+ * bar height is the amplitude. Bar pitch stays fixed and the visible
+ * count drops from the right as space shrinks, so the row never
+ * squashes. Motion follows the neon-visualizer recipe
  * (per-bar value noise + sine oscillator + one shared beat), scaled by the
  * live mic peak so the row swells when the user speaks. Bar color walks a
  * magenta -> blue -> cyan gradient across the row.
@@ -14,8 +16,11 @@ Item {
   property bool active: false
   property real level: 0
 
-  readonly property int barCount: 32
+  readonly property int maxBars: 32
+  readonly property real barStep: 5
+  readonly property real barWidth: 3
   readonly property real minHeight: 3
+  readonly property int visibleBars: Math.max(4, Math.min(maxBars, Math.floor(width / barStep)))
 
   property real time: 0
   property real beatPhase: 0
@@ -38,8 +43,8 @@ Item {
     root.pulse = 0.65 + 0.35 * (beat - 0.5) / 0.9
     root.smoothedLevel += (Math.min(1, root.level * 1.6) - root.smoothedLevel) * Math.min(1, dt * 10)
     const mic = 0.25 + 0.75 * root.smoothedLevel
-    const heights = new Array(root.barCount)
-    for (let i = 0; i < root.barCount; i++) {
+    const heights = new Array(root.maxBars)
+    for (let i = 0; i < root.maxBars; i++) {
       const noise = noise2(i * 0.3, root.time)
       const osc = (Math.sin(root.time + i * 0.4) + 1) * 0.5
       let amp = (noise * 0.7 + osc * 0.3) * beat * mic // up to ~1.4
@@ -74,9 +79,9 @@ Item {
   }
 
   Component.onCompleted: {
-    const colors = new Array(root.barCount)
-    for (let i = 0; i < root.barCount; i++) {
-      const t = i / (root.barCount - 1)
+    const colors = new Array(root.maxBars)
+    for (let i = 0; i < root.maxBars; i++) {
+      const t = i / (root.maxBars - 1)
       colors[i] = t < 0.5
         ? lerpColor(Colors.magenta, Colors.blue, t * 2)
         : lerpColor(Colors.blue, Colors.cyan, (t - 0.5) * 2)
@@ -89,15 +94,14 @@ Item {
     opacity: root.pulse
 
     Repeater {
-      model: root.barCount
+      model: root.visibleBars
 
       delegate: Rectangle {
         required property int index
-        readonly property real step: root.width / root.barCount
 
-        width: Math.max(2, step * 0.6)
+        width: root.barWidth
         height: root.barHeights[index] || root.minHeight
-        x: step * index + (step - width) / 2
+        x: root.barStep * index + (root.barStep - width) / 2
         y: (root.height - height) / 2
         radius: width / 2
         color: root.barColors[index] || Colors.cyan

@@ -25,6 +25,13 @@ Scope {
   property bool expanded: false
   property bool contentReady: false
   property bool closing: false
+  property int elapsedSec: 0
+
+  function formatElapsed(sec: int): string {
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return (m < 10 ? "0" + m : "" + m) + ":" + (s < 10 ? "0" + s : "" + s)
+  }
 
   readonly property color pillBorder: {
     switch (root.displayState) {
@@ -38,15 +45,18 @@ Scope {
 
   readonly property int faceWidth: {
     switch (root.displayState) {
-    case "recording": return 236
+    case "recording": return recordingFace.implicitWidth + 28
     case "transcribing": return transcribingFace.implicitWidth + 28
     case "done": return doneFace.implicitWidth + 28
     case "error": return errorFace.implicitWidth + 28
-    default: return 236
+    default: return recordingFace.implicitWidth + 28
     }
   }
 
-  onDictationStateChanged: if (dictationState !== "idle") root.displayState = dictationState
+  onDictationStateChanged: {
+    if (dictationState !== "idle") root.displayState = dictationState
+    if (dictationState === "recording") root.elapsedSec = 0
+  }
 
   onShownChanged: shown ? showOsd() : hideOsd()
 
@@ -148,6 +158,15 @@ Scope {
     }
   }
 
+  Timer {
+    id: elapsedTimer
+    interval: 500
+    repeat: true
+    running: Dictation.state === "recording"
+    triggeredOnStart: true
+    onTriggered: root.elapsedSec = Math.max(0, Math.floor((Date.now() - Dictation.startMs) / 1000))
+  }
+
   PanelWindow {
     id: win
     screen: Quickshell.primaryScreen || null
@@ -215,7 +234,6 @@ Scope {
       RowLayout {
         id: recordingFace
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
-        width: 208
         spacing: 10
         opacity: root.contentReady && root.displayState === "recording" ? 1 : 0
         scale: root.contentReady && root.displayState === "recording" ? 1 : 0.92
@@ -226,18 +244,25 @@ Scope {
         Item { Layout.preferredWidth: 20; Layout.preferredHeight: 20 }
 
         Waveform {
-          Layout.fillWidth: true
+          Layout.preferredWidth: 120
           Layout.preferredHeight: 26
           Layout.alignment: Qt.AlignVCenter
           active: root.contentReady && Dictation.state === "recording"
           level: Dictation.peak
         }
 
+        Label {
+          Layout.alignment: Qt.AlignVCenter
+          text: root.formatElapsed(root.elapsedSec)
+          useMono: true
+          color: Colors.white
+        }
+
         Item {
           id: actions
           property real reveal: pillHover.hovered ? 1 : 0
           Behavior on reveal { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 1.18 } }
-
+          visible: reveal > 0.02
           Layout.preferredWidth: Math.max(0, reveal * 70)
           Layout.preferredHeight: 30
           Layout.alignment: Qt.AlignVCenter
@@ -269,6 +294,8 @@ Scope {
         tone: Colors.blue
         label: "Transcribing"
         conic: true
+        cancellable: true
+        onCancelled: Dictation.cancel()
         faceActive: root.contentReady && root.displayState === "transcribing"
       }
 
@@ -333,6 +360,8 @@ Scope {
     property string label: ""
     property bool conic: false
     property bool faceActive: false
+    property bool cancellable: false
+    signal cancelled()
 
     spacing: 10
     opacity: faceActive ? 1 : 0
@@ -391,6 +420,27 @@ Scope {
       text: statusFace.label
       color: statusFace.tone
       weight: Font.Medium
+    }
+
+    Item {
+      id: cancelSlot
+      property real reveal: pillHover.hovered ? 1 : 0
+      Behavior on reveal { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 1.18 } }
+      visible: statusFace.cancellable && reveal > 0.02
+      Layout.preferredWidth: reveal * 30
+      Layout.preferredHeight: 30
+      Layout.alignment: Qt.AlignVCenter
+      clip: true
+
+      Row {
+        anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+        FaceButton {
+          icon: "x"
+          tone: Colors.red
+          reveal: cancelSlot.reveal
+          onClicked: statusFace.cancelled()
+        }
+      }
     }
   }
 }
