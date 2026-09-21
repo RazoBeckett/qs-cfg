@@ -3,7 +3,7 @@ import QtQuick
 
 /*
  * Symmetric voice waveform driven only by the processed microphone level.
- * Bars react in place and return to a flat line during silence.
+ * Samples flow from right to left and clear immediately during silence.
  * Bar color walks a magenta -> blue -> cyan gradient across the row.
  */
 Item {
@@ -19,9 +19,18 @@ Item {
   readonly property int visibleBars: Math.max(4, Math.min(maxBars, Math.floor(width / barStep)))
 
   property real smoothedLevel: 0
+  property real sampleElapsed: 0
+  property var barHeights: []
   property var barColors: []
 
-  onActiveChanged: if (!active) root.smoothedLevel = 0
+  function clearBars(): void {
+    root.smoothedLevel = 0
+    root.sampleElapsed = 0
+    root.barHeights = new Array(root.visibleBars).fill(root.minHeight)
+  }
+
+  onActiveChanged: root.clearBars()
+  onVisibleBarsChanged: root.clearBars()
 
   FrameAnimation {
     running: root.active && (root.level > 0 || root.smoothedLevel > 0)
@@ -31,16 +40,20 @@ Item {
   function advance(dt: real): void {
     const target = Math.max(0, Math.min(1, root.level))
     if (target === 0) {
-      root.smoothedLevel = 0
+      root.clearBars()
       return
     }
-    root.smoothedLevel += (target - root.smoothedLevel) * Math.min(1, dt * 18)
-  }
 
-  function barScale(index: int): real {
-    const center = (root.visibleBars - 1) / 2
-    const distance = center > 0 ? Math.abs(index - center) / center : 0
-    return 0.35 + 0.65 * (1 - distance)
+    root.smoothedLevel += (target - root.smoothedLevel) * Math.min(1, dt * 18)
+    root.sampleElapsed += dt
+    if (root.sampleElapsed < 0.05) return
+    root.sampleElapsed = 0
+
+    const heights = root.barHeights.slice()
+    while (heights.length < root.visibleBars) heights.push(root.minHeight)
+    heights.shift()
+    heights.push(root.minHeight + (root.height - root.minHeight) * root.smoothedLevel)
+    root.barHeights = heights
   }
 
   function lerpColor(a: color, b: color, t: real): color {
@@ -68,7 +81,7 @@ Item {
         required property int index
 
         width: root.barWidth
-        height: root.minHeight + (root.height - root.minHeight) * root.smoothedLevel * root.barScale(index)
+        height: root.barHeights[index] || root.minHeight
         x: root.barStep * index + (root.barStep - width) / 2
         y: (root.height - height) / 2
         radius: width / 2
