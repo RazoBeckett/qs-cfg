@@ -248,7 +248,7 @@ Scope {
           Layout.preferredHeight: 26
           Layout.alignment: Qt.AlignVCenter
           active: root.contentReady && Dictation.state === "recording"
-          level: Dictation.peak
+          level: Dictation.voiceLevel
         }
 
         Label {

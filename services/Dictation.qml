@@ -19,7 +19,17 @@ Singleton {
   // pasted | copied, set when the transcript leaves the shell
   property string lastAction: "pasted"
   readonly property real peak: peakMonitor.peak
+  property real voiceLevel: 0
+  property real noiseFloor: 0.005
+  property bool speechStarted: false
+  property int speechFrames: 0
+  property double lastSpeechMs: 0
+  readonly property real speechThreshold: Math.max(0.02, noiseFloor * 2.5 + 0.005)
   readonly property string audioPath: Quickshell.cachePath("dictate.raw")
+
+  readonly property int initialSilenceMs: 10000
+  readonly property int trailingSilenceMs: 7000
+  property double startMs: 0
 
   // mip_opt_out keeps audio out of training, retained only to process.
   readonly property string listenUrl: {
@@ -46,14 +56,19 @@ Singleton {
       notify("Dictation", "Add a Deepgram API key in Settings > AI")
       return
     }
+    root.startMs = Date.now()
+    root.voiceLevel = 0
+    root.noiseFloor = 0.005
+    root.speechStarted = false
+    root.speechFrames = 0
+    root.lastSpeechMs = root.startMs
     root.state = "recording"
     recorder.running = true
-    limitTimer.restart()
   }
 
   function stop(): void {
     if (root.state !== "recording") return
-    limitTimer.stop()
+    root.voiceLevel = 0
     root.state = "transcribing"
     // SIGTERM. Raw PCM has no header, so a stop at any moment is safe.
     recorder.running = false
@@ -61,8 +76,8 @@ Singleton {
 
   function cancel(): void {
     if (root.state === "idle") return
-    limitTimer.stop()
     resetTimer.stop()
+    root.voiceLevel = 0
     root.state = "idle"
     recorder.running = false
     upload.running = false
@@ -73,6 +88,31 @@ Singleton {
     if (root.state === "idle") begin()
     else if (root.state === "recording") stop()
     else cancel()
+  }
+
+  function monitorVoice(): void {
+    const now = Date.now()
+    const level = root.peak
+    const threshold = root.speechThreshold
+
+    if (level >= threshold) {
+      root.speechFrames++
+      if (root.speechFrames >= 3) {
+        root.speechStarted = true
+        root.lastSpeechMs = now
+        root.voiceLevel = Math.min(1, (level - threshold) * 6)
+      } else {
+        root.voiceLevel = 0
+      }
+    } else {
+      root.speechFrames = 0
+      root.voiceLevel = 0
+      root.noiseFloor = root.noiseFloor * 0.95 + level * 0.05
+    }
+
+    const silenceMs = root.speechStarted ? root.trailingSilenceMs : root.initialSilenceMs
+    const silenceStartMs = root.speechStarted ? root.lastSpeechMs : root.startMs
+    if (now - silenceStartMs >= silenceMs) root.stop()
   }
 
   function transcriptFrom(response: string): string {
@@ -159,11 +199,11 @@ Singleton {
     enabled: root.state === "recording" && Pipewire.defaultAudioSource
   }
 
-  // Deepgram bills per minute. Never let a recording run away.
   Timer {
-    id: limitTimer
-    interval: 60000
-    onTriggered: root.stop()
+    interval: 50
+    repeat: true
+    running: root.state === "recording"
+    onTriggered: root.monitorVoice()
   }
 
   Timer {
