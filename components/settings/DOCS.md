@@ -39,6 +39,7 @@ From `services/Settings.qml`:
 - `Settings.ai.smartFormat` (bool, default true)
 - `Settings.ai.punctuate` (bool, default true)
 - `Settings.ai.autoCopy` (bool, default false)
+- `Settings.ai.retentionDays` (int, default 30, 0 keeps forever)
 
 Writing any of these from QML saves `kettshell.json` automatically.
 
