@@ -71,7 +71,7 @@ WrapperMouseArea {
       }
 
       Label {
-        text: root.ready ? root.level + "%" : "-"
+        text: root.ready ? String(root.level).padStart(3, " ") + "%" : "-"
         color: root.charging ? Colors.waybarCharging : root.critical ? Colors.foreground : Colors.foreground
         weight: Font.Bold
       }
