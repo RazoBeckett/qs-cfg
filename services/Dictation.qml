@@ -3,20 +3,21 @@ pragma Singleton
 import ".."
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 
 /*
- * Dictation state machine. Records 16 kHz mono raw PCM with pw-record,
- * uploads to Deepgram on stop, and types the transcript with wtype.
- * Owns no visuals; DictationOsd reads `state`, `peak`, and `lastAction`.
+ * Dictation state machine. Records 16 kHz mono raw PCM, uploads to
+ * Deepgram, and types the result. DictationOsd reads state, peak, and
+ * lastAction. History is appended as JSONL.
  */
 Singleton {
   id: root
 
-  // idle | recording | transcribing | done | error
+  // idle | recording | transcribing | typing | done | error
   property string state: "idle"
-  // pasted | copied, set when the transcript leaves the shell
+  // pasted | copied
   property string lastAction: "pasted"
   readonly property real peak: peakMonitor.peak
   property real voiceLevel: 0
@@ -26,21 +27,41 @@ Singleton {
   property double lastSpeechMs: 0
   readonly property real speechThreshold: Math.max(0.02, noiseFloor * 2.5 + 0.005)
   readonly property string audioPath: Quickshell.cachePath("dictate.raw")
+  readonly property string historyPath: Quickshell.dataPath("transcripts.jsonl")
 
+  // Timings for recording endpointing and the pill.
   readonly property int initialSilenceMs: 10000
   readonly property int trailingSilenceMs: 7000
-  property double startMs: 0
+  readonly property int errorMs: 2000
+  readonly property int doneMs: 1400
 
+  // Snapshot for the current utterance, filled at begin() so history and
+  // the upload use the same values even if Settings change mid recording.
+  property double startMs: 0
+  property double uploadStartMs: 0
+  property string snapModel: ""
+  property string snapLanguage: ""
+  property bool snapSmartFormat: true
+  property bool snapPunctuate: true
+  property string snapAppClass: ""
+  property string snapAppTitle: ""
+  property double snapConfidence: -1
+
+  // Deepgram listen URL, snapshot aware so the request matches history.
   // mip_opt_out keeps audio out of training, retained only to process.
   readonly property string listenUrl: {
+    const model = root.snapModel || Settings.ai.model
+    const lang = root.snapLanguage || Settings.ai.language
+    const smart = root.snapModel ? root.snapSmartFormat : Settings.ai.smartFormat
+    const punct = root.snapModel ? root.snapPunctuate : Settings.ai.punctuate
     const params = [
-      "model=" + encodeURIComponent(Settings.ai.model),
+      "model=" + encodeURIComponent(model),
       "encoding=linear16",
       "sample_rate=16000",
       "channels=1",
-      "smart_format=" + Settings.ai.smartFormat,
-      "punctuate=" + Settings.ai.punctuate,
-      "language=" + encodeURIComponent(Settings.ai.language),
+      "smart_format=" + smart,
+      "punctuate=" + punct,
+      "language=" + encodeURIComponent(lang),
       "mip_opt_out=true"
     ]
     return "https://api.deepgram.com/v1/listen?" + params.join("&")
@@ -48,6 +69,22 @@ Singleton {
 
   function notify(summary: string, body: string): void {
     Quickshell.execDetached(["notify-send", "-a", "KettShell", summary, body])
+  }
+
+  function clearAudio(): void {
+    Quickshell.execDetached(["rm", "-f", root.audioPath])
+  }
+
+  function captureContext(): void {
+    const tl = Hyprland.activeToplevel
+    if (!tl) {
+      root.snapAppClass = ""
+      root.snapAppTitle = ""
+      return
+    }
+    const ipc = tl.lastIpcObject
+    root.snapAppClass = ipc && ipc.class ? String(ipc.class).slice(0, 120) : ""
+    root.snapAppTitle = tl.title ? String(tl.title).slice(0, 200) : ""
   }
 
   function begin(): void {
@@ -62,6 +99,12 @@ Singleton {
     root.speechStarted = false
     root.speechFrames = 0
     root.lastSpeechMs = root.startMs
+    root.snapModel = Settings.ai.model
+    root.snapLanguage = Settings.ai.language
+    root.snapSmartFormat = Settings.ai.smartFormat
+    root.snapPunctuate = Settings.ai.punctuate
+    root.snapConfidence = -1
+    captureContext()
     root.state = "recording"
     recorder.running = true
   }
@@ -69,8 +112,8 @@ Singleton {
   function stop(): void {
     if (root.state !== "recording") return
     root.voiceLevel = 0
+    root.uploadStartMs = Date.now()
     root.state = "transcribing"
-    // SIGTERM. Raw PCM has no header, so a stop at any moment is safe.
     recorder.running = false
   }
 
@@ -81,7 +124,7 @@ Singleton {
     root.state = "idle"
     recorder.running = false
     upload.running = false
-    Quickshell.execDetached(["rm", "-f", root.audioPath])
+    clearAudio()
   }
 
   function toggle(): void {
@@ -115,26 +158,94 @@ Singleton {
     if (now - silenceStartMs >= silenceMs) root.stop()
   }
 
-  function transcriptFrom(response: string): string {
+  function parseTranscript(response: string): var {
     try {
       const json = JSON.parse(response)
-      const channels = json && json.results && json.results.channels
-      const alt = channels && channels[0] && channels[0].alternatives && channels[0].alternatives[0]
-      return alt && alt.transcript ? alt.transcript.trim() : ""
-    } catch (error) {
-      return ""
+      const alt = json?.results?.channels?.[0]?.alternatives?.[0]
+      const c = alt && typeof alt.confidence === "number" ? alt.confidence : -1
+      const text = alt?.transcript ? String(alt.transcript).trim() : ""
+      return { text: text, confidence: c }
+    } catch (e) {
+      return { text: "", confidence: -1 }
     }
   }
 
+  function countWords(text: string): int {
+    const t = text.trim()
+    return t.length === 0 ? 0 : t.split(/\s+/).filter(function(w) { return w.length > 0 }).length
+  }
+
+  function buildEntry(text: string, status: string): var {
+    const now = Date.now()
+    const recMs = root.uploadStartMs > root.startMs ? Math.round(root.uploadStartMs - root.startMs) : 0
+    const processingMs = root.uploadStartMs > 0 ? Math.max(0, Math.round(now - root.uploadStartMs)) : 0
+    return {
+      id: String(now) + "-" + Math.random().toString(36).slice(2, 8),
+      ts: new Date(root.startMs).toISOString(),
+      text: text,
+      status: status,
+      confidence: root.snapConfidence >= 0 ? root.snapConfidence : null,
+      model: root.snapModel,
+      language: root.snapLanguage,
+      smartFormat: root.snapSmartFormat,
+      punctuate: root.snapPunctuate,
+      provider: "deepgram",
+      audioDurationMs: recMs,
+      processingMs: processingMs,
+      wordCount: countWords(text),
+      charCount: text.length,
+      appClass: root.snapAppClass,
+      appTitle: root.snapAppTitle,
+      outputMethod: root.lastAction
+    }
+  }
+
+  function appendHistory(text: string, status: string): void {
+    const entry = buildEntry(text, status)
+    const line = JSON.stringify(entry)
+    const cur = historyFile.text()
+    const next = cur.length === 0 ? line + "\n" : (cur.endsWith("\n") ? cur + line + "\n" : cur + "\n" + line + "\n")
+    historyFile.setText(next)
+    pruneHistory()
+  }
+
+  function pruneHistory(): void {
+    const days = Settings.ai.retentionDays
+    if (days === 0) return
+    const cur = historyFile.text()
+    if (cur.length === 0) return
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+    const lines = cur.split("\n")
+    let kept = []
+    let dropped = false
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i].trim()
+      if (ln.length === 0) continue
+      try {
+        const obj = JSON.parse(ln)
+        const t = Date.parse(obj.ts)
+        if (!isNaN(t) && t < cutoff) { dropped = true; continue }
+      } catch (e) {}
+      kept.push(lines[i])
+    }
+    if (dropped) historyFile.setText(kept.length === 0 ? "" : kept.join("\n") + "\n")
+  }
+
   function finish(): void {
-    const text = transcriptFrom(upload.response)
-    if (text === "") {
+    const parsed = parseTranscript(upload.response)
+    root.snapConfidence = parsed.confidence
+    if (parsed.text === "") {
+      appendHistory("", "empty")
+      clearAudio()
       root.state = "error"
-      resetTimer.interval = 2000
+      resetTimer.interval = errorMs
       resetTimer.restart()
       return
     }
-    typer.text = text
+    appendHistory(parsed.text, "success")
+    clearAudio()
+    root.state = "typing"
+    typer.text = parsed.text
     typer.running = true
   }
 
@@ -146,9 +257,8 @@ Singleton {
         upload.response = ""
         upload.running = true
       } else if (root.state === "recording") {
-        // The recorder died on its own: no mic or a busy device.
         root.state = "error"
-        resetTimer.interval = 2000
+        resetTimer.interval = errorMs
         resetTimer.restart()
       }
     }
@@ -177,18 +287,17 @@ Singleton {
     property string text: ""
     command: ["wtype", "-d", "1", "--", typer.text]
     onExited: function(exitCode) {
-      if (root.state !== "transcribing") return
+      if (root.state !== "typing") return
       if (exitCode === 0) {
         root.lastAction = "pasted"
         if (Settings.ai.autoCopy) Quickshell.execDetached(["wl-copy", "--", typer.text])
       } else {
-        // Some XWayland clients reject the virtual keyboard. Never lose the text.
         root.lastAction = "copied"
         Quickshell.execDetached(["wl-copy", "--", typer.text])
-        root.notify("Dictation", "Could not type into the focused window. Transcript copied to clipboard.")
+        notify("Dictation", "Could not type into the focused window. Transcript copied to clipboard.")
       }
       root.state = "done"
-      resetTimer.interval = 1400
+      resetTimer.interval = doneMs
       resetTimer.restart()
     }
   }
@@ -197,6 +306,14 @@ Singleton {
     id: peakMonitor
     node: Pipewire.defaultAudioSource
     enabled: root.state === "recording" && Pipewire.defaultAudioSource
+  }
+
+  FileView {
+    id: historyFile
+    path: root.historyPath
+    printErrors: false
+    atomicWrites: true
+    onLoaded: pruneHistory()
   }
 
   Timer {

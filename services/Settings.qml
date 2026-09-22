@@ -59,6 +59,7 @@ Singleton {
         property bool smartFormat: true
         property bool punctuate: true
         property bool autoCopy: false
+        property int retentionDays: 30
       }
     }
   }

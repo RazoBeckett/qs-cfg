@@ -37,6 +37,7 @@ Scope {
     switch (root.displayState) {
     case "recording": return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.45)
     case "transcribing": return Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.4)
+    case "typing": return Qt.rgba(Colors.blue.r, Colors.blue.g, Colors.blue.b, 0.4)
     case "done": return Qt.rgba(Colors.green.r, Colors.green.g, Colors.green.b, 0.45)
     case "error": return Qt.rgba(Colors.red.r, Colors.red.g, Colors.red.b, 0.6)
     default: return Colors.border
@@ -47,6 +48,7 @@ Scope {
     switch (root.displayState) {
     case "recording": return recordingFace.implicitWidth + 28
     case "transcribing": return transcribingFace.implicitWidth + 28
+    case "typing": return typingFace.implicitWidth + 28
     case "done": return doneFace.implicitWidth + 28
     case "error": return errorFace.implicitWidth + 28
     default: return recordingFace.implicitWidth + 28
@@ -300,6 +302,16 @@ Scope {
       }
 
       StatusFace {
+        id: typingFace
+        anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
+        tone: Colors.yellow
+        label: "Typing"
+        conic: true
+        yellow: true
+        faceActive: root.contentReady && root.displayState === "typing"
+      }
+
+      StatusFace {
         id: doneFace
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         glyph: "check"
@@ -359,6 +371,7 @@ Scope {
     property color tone: Colors.foreground
     property string label: ""
     property bool conic: false
+    property bool yellow: false
     property bool faceActive: false
     property bool cancellable: false
     signal cancelled()
@@ -382,10 +395,17 @@ Scope {
           ctx.clearRect(0, 0, width, height)
           ctx.reset()
           const grad = ctx.createConicalGradient(c, c, 0)
-          grad.addColorStop(0, Colors.magenta.toString())
-          grad.addColorStop(0.33, Colors.blue.toString())
-          grad.addColorStop(0.66, Colors.cyan.toString())
-          grad.addColorStop(1, Colors.magenta.toString())
+          if (statusFace.yellow) {
+            grad.addColorStop(0, Colors.yellow.toString())
+            grad.addColorStop(0.33, Qt.lighter(Colors.yellow, 1.18).toString())
+            grad.addColorStop(0.66, Qt.darker(Colors.yellow, 1.12).toString())
+            grad.addColorStop(1, Colors.yellow.toString())
+          } else {
+            grad.addColorStop(0, Colors.magenta.toString())
+            grad.addColorStop(0.33, Colors.blue.toString())
+            grad.addColorStop(0.66, Colors.cyan.toString())
+            grad.addColorStop(1, Colors.magenta.toString())
+          }
           ctx.fillStyle = grad
           ctx.beginPath()
           ctx.arc(c, c, c, 0, Math.PI * 2)
