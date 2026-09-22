@@ -334,9 +334,11 @@ ColumnLayout {
     Layout.fillWidth: true
     Layout.topMargin: 8
 
-    Row {
-      spacing: 6
+    Flow {
+      id: flowBox
+      Layout.preferredWidth: 240
       Layout.alignment: Qt.AlignVCenter
+      spacing: 6
 
       Repeater {
         model: ["nova-3", "nova-2", "enhanced", "base"]

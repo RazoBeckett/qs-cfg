@@ -7,6 +7,8 @@ import Quickshell.Widgets
 
 /*
  * Settings card: sidebar tabs on the left, page content on the right.
+ * Width breakpoints: 900 and up keeps the full sidebar, below that
+ * collapses it to icons with tooltips.
  * Open plays a staggered intro (card, then sidebar, then content); close
  * collapses content and sidebar first, then the card.
  */
@@ -23,6 +25,10 @@ Item {
   property string commitHash: "development"
   property bool commitResolved: false
   readonly property string commitDisplay: "KettShell @" + commitHash
+
+  // 2 is wide, 1 is medium. Medium starts at 640 and keeps the
+  // icon-only sidebar usable at the minimum window size.
+  readonly property int mode: width >= 900 ? 2 : 1
 
   signal closeFinished
 
@@ -55,6 +61,14 @@ Item {
     closeSequence.restart()
   }
 
+  function resetIntro(): void {
+    openSequence.stop()
+    closeSequence.stop()
+    introBase = 0.0
+    introSidebar = 0.0
+    introContent = 0.0
+  }
+
   function nextTab(): void {
     currentTab = (currentTab + 1) % tabsModel.length
   }
@@ -71,9 +85,6 @@ Item {
   }
 
   onCurrentTabChanged: settingsFlick.contentY = 0
-
-  implicitWidth: 880
-  implicitHeight: 600
 
   readonly property var tabsModel: [
     { name: "UI", icon: "sliders-horizontal" },
@@ -191,7 +202,7 @@ Item {
         spacing: 0
 
         Item {
-          Layout.preferredWidth: 224
+          Layout.preferredWidth: root.mode === 2 ? 224 : 72
           Layout.fillHeight: true
           opacity: root.introSidebar
           transform: Translate { x: -30 * (1.0 - root.introSidebar) }
@@ -211,6 +222,11 @@ Item {
               Layout.bottomMargin: 10
               spacing: 10
 
+              Item {
+                visible: root.mode === 1
+                Layout.fillWidth: true
+              }
+
               Text {
                 text: "gear"
                 color: Colors.blue
@@ -219,9 +235,15 @@ Item {
               }
 
               Label {
+                visible: root.mode === 2
                 text: "Settings"
                 color: Colors.foreground
                 weight: Font.Bold
+                Layout.fillWidth: true
+              }
+
+              Item {
+                visible: root.mode === 1
                 Layout.fillWidth: true
               }
             }
@@ -249,6 +271,7 @@ Item {
                   model: root.tabsModel
 
                   delegate: Item {
+                    id: tabBtn
                     Layout.fillWidth: true
                     Layout.preferredHeight: 44
 
@@ -263,10 +286,15 @@ Item {
 
                     RowLayout {
                       anchors.fill: parent
-                      anchors.leftMargin: 14 + (active ? 4 : 0)
-                      anchors.rightMargin: 14
+                      anchors.leftMargin: root.mode === 2 ? 14 + (active ? 4 : 0) : 0
+                      anchors.rightMargin: root.mode === 2 ? 14 : 0
                       spacing: 10
                       Behavior on anchors.leftMargin { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+
+                      Item {
+                        visible: root.mode === 1
+                        Layout.fillWidth: true
+                      }
 
                       Text {
                         text: modelData.icon
@@ -277,12 +305,18 @@ Item {
                       }
 
                       Label {
+                        visible: root.mode === 2
                         text: modelData.name
                         color: active ? Colors.black : Colors.white
                         weight: Font.DemiBold
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                         Behavior on color { ColorAnimation { duration: 150 } }
+                      }
+
+                      Item {
+                        visible: root.mode === 1
+                        Layout.fillWidth: true
                       }
                     }
 
@@ -293,6 +327,45 @@ Item {
                       cursorShape: Qt.PointingHandCursor
                       onClicked: root.currentTab = index
                     }
+
+                    PopupWindow {
+                      id: tabTip
+                      visible: tabMa.containsMouse && root.mode === 1 && !active
+                      grabFocus: false
+                      color: Colors.transparent
+                      implicitWidth: tipBg.width
+                      implicitHeight: tipBg.height
+
+                      anchor {
+                        item: tabBtn
+                        adjustment: PopupAdjustment.Slide
+                        edges: Edges.Top | Edges.Left
+                        gravity: Edges.Bottom | Edges.Right
+                        rect.x: tabBtn.width + 8
+                        rect.y: Math.round((tabBtn.height - tabTip.implicitHeight) / 2)
+                        rect.width: 1
+                        rect.height: 1
+                      }
+
+                      Rectangle {
+                        id: tipBg
+                        width: tipLabel.implicitWidth + 16
+                        height: tipLabel.implicitHeight + 8
+                        color: Colors.black
+                        border.color: Colors.border
+                        border.width: 1
+                        radius: Settings.rounding.sm
+                        clip: true
+
+                        Label {
+                          id: tipLabel
+                          anchors.centerIn: parent
+                          text: modelData.name
+                          color: Colors.foreground
+                          size: Typography.sizeXS
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -301,6 +374,7 @@ Item {
             Item { Layout.fillHeight: true }
 
             Label {
+              visible: root.mode === 2
               text: root.commitDisplay
               color: Colors.white
               size: Typography.sizeXS
@@ -350,13 +424,14 @@ Item {
               Layout.fillWidth: true
               Layout.fillHeight: true
               clip: true
-              contentWidth: width
+              contentWidth: settingsFlick.width
               contentHeight: flickContent.implicitHeight
               boundsBehavior: Flickable.StopAtBounds
 
               ColumnLayout {
                 id: flickContent
-                width: parent.width
+                width: Math.min(settingsFlick.width, 700)
+                anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 12
 
                 UiTab { visible: root.currentTab === 0; Layout.fillWidth: true }

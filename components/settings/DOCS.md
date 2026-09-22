@@ -5,13 +5,15 @@ reads/writes the `Settings` singleton, which persists to `kettshell.json`.
 
 ## Files
 
-- `SettingsWindow.qml` — fullscreen overlay on the primary screen. Owns the
-  IPC handler (`qs ipc call settings toggle|open|close`) and the
-  `settings-toggle` global shortcut. Outside click and Escape play the close
-  animation instead of hiding instantly.
+- `SettingsWindow.qml` — real toplevel `FloatingWindow` titled
+  `Settings` (880x600 preferred, 640x520 minimum). Owns the IPC
+  handler (`qs ipc call settings toggle|open|close`) and the
+  `settings-toggle` global shortcut. Stays open on outside click;
+  closes on X, Escape, or the toggle.
 - `SettingsMenu.qml` — the card itself. Sidebar tabs on the left, page
   content on the right. Owns the open/close animations and the sliding
-  active-tab highlight.
+  active-tab highlight. Below 900px wide the sidebar collapses to
+  icons with `PopupWindow` tooltips anchored to each tab.
 - `SettingsRow.qml` — one row: title plus subtitle on the left, a
   caller-supplied control in a 240px box on the right.
 - `UiTab.qml`, `WallpaperTab.qml`, `FontsTab.qml`, `AITab.qml`, `AboutTab.qml` — the five pages.
@@ -114,7 +116,8 @@ card, and fires `closeFinished` which the window uses to actually hide.
 
 `SettingsWindow` keeps the window mapped while
 `root.open || menu.busy` is true, so the close animation always finishes
-before the window unmaps.
+before the window unmaps. The X button also closes: `onClosed` resets
+`root.open` and the intro progress.
 
 ## Library path editing
 
@@ -123,7 +126,14 @@ mode: a text field pre-filled with the current path. Enter writes
 `Settings.wallpaper.directory`, Esc cancels. `Wallpapers` re-lists from
 the new location on its own. A native folder picker was tried and
 dropped: without a GTK platform theme Qt falls back to an in-window
-dialog that misbehaves on a layer-shell overlay, so typing the path won.
+dialog that misbehaves on overlays, so typing the path won.
+
+## Windowing
+
+The Hyprland rule in `modules/windowrule.conf` (mirrored in
+`modules/windowrule.lua`) floats, centers, and sizes the window
+(`float`, `center`, `size 880 600` on class `org.quickshell` with title
+`Settings`). Without it Hyprland tiles the window.
 
 ## Gotchas
 

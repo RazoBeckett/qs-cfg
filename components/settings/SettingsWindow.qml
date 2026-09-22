@@ -1,19 +1,14 @@
 import "../.."
 import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
 import Quickshell.Hyprland
+import Quickshell.Io
 import QtQuick
-import QtQuick.Dialogs
 
 /*
- * Host window for the settings menu. Fullscreen transparent overlay on the
- * primary screen; outside click and Escape play the close animation.
- * Toggle with `qs ipc call settings toggle` (e.g. bound to Win+I in Hyprland).
- *
- * The folder picker is a native window, which always stacks below this
- * overlay. Picking a directory therefore hides the menu first and reopens
- * it once the dialog closes.
+ * Host window for the settings menu. Real toplevel window titled
+ * "Settings" so it shows in Alt Tab and stays open until closed.
+ * Close with the window X button, Escape, or Win+I toggle.
+ * Toggle with `qs ipc call settings toggle` (bound to Win+I in Hyprland).
  */
 Scope {
   id: root
@@ -48,37 +43,25 @@ Scope {
     onPressed: root.toggle()
   }
 
-  PanelWindow {
+  FloatingWindow {
     id: win
-    screen: Quickshell.primaryScreen || null
-
+    title: "Settings"
+    minimumSize: Qt.size(640, 520)
+    implicitWidth: 880
+    implicitHeight: 600
     visible: root.open || menu.busy
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    color: "transparent"
-    focusable: true
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.namespace: "kettshell-settings"
-    WlrLayershell.keyboardFocus: root.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    color: Colors.background
 
-    MouseArea {
-      anchors.fill: parent
-      onClicked: menu.playClose()
+    onClosed: {
+      root.open = false
+      menu.resetIntro()
     }
 
     SettingsMenu {
       id: menu
-      anchors.centerIn: parent
+      anchors.fill: parent
       open: root.open
       onCloseFinished: root.open = false
-    }
-
-    HyprlandFocusGrab {
-      active: root.open
-      windows: [win]
-      onCleared: menu.playClose()
     }
   }
 }
