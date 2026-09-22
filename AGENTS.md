@@ -1,23 +1,24 @@
-Always refer @CODING-STANDARDS.md file before making any changes.
+# Project instructions
 
-refer to 'quickshell' skill.
+## Before editing
 
-refer to 'quickshell-ui' skill when touching any visible surface.
+1. Read `CODING-STANDARDS.md` before changing any repository file. Apply every relevant rule and use its linked feature documentation as the source of truth.
+2. Read the `quickshell` skill for every Quickshell or QML task. Verify APIs and framework behavior against the official Quickshell and Qt QML documentation linked there.
+3. Read the `quickshell-ui` skill before changing a visible surface, including its layout, styling, typography, icons, clipping, empty states, or motion.
 
-- I don't want any "Bashisms", i.e., no `['bash', '-c', ...]`. Let's stick to POSIX-compliant `sh` and keep it clean.
-- Do not preserve complexity just because it already exists. Do not introduce machinery because it looks architecturally impressive. Understand the real constraint, then fight for the smallest model that makes the correct behavior unsurprising.
-- Channel both "measure twice, cut once" and "yagni". Fight scope creep. Try to honor the dev's intent in both a minimal and realistic fashion.
-- Follow SOLID principles where they genuinely improve the design. Do not force abstractions or patterns just to satisfy a principle. Prefer simple, focused, and maintainable components.
-- Do not make assumptions. Make sure everything is correct before making changes.
-- Assume you know nothing and always refer to the Quickshell and QML documentation to understand how something should be implemented. Follow the documented, correct approach rather than guessing or relying on assumptions.
-- Always implement things using Quickshell-native functionality whenever possible. If something cannot be done natively, discuss the approach with the maintainer before applying any changes.
-- When a piece of code needs to be repeated more than twice, follow the DRY principle and refactor it.
-- Comments describe how a thing is used, and move when the code moves. To be used mostly to describe functions, not to annotate every line of behavior.
-- If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
-- Do not include user-specific or environment-specific information in code, comments, or commit messages, e.g., Wi-Fi SSIDs, Bluetooth device names, usernames, hostnames, file paths, etc.
+The reading step is complete when you can name the relevant project rules and documentation for the planned change without guessing.
 
-docs:
-- [Quickshell introduction](https://quickshell.org/docs/v0.3.0/guide/introduction/)
-- [Type reference](https://quickshell.org/docs/v0.3.0/types/)
-- [Qt QML documents](https://doc.qt.io/qt-6/qtqml-documents-topic.html)
-- [Qt item size and positioning](https://doc.qt.io/qt-6/qtquick-positioning.html)
+## Implementation
+
+- Apply YAGNI. Build the smallest documented design that satisfies the current requirement. Remove accidental complexity instead of preserving it, and add no machinery for hypothetical needs.
+- Prefer Quickshell-native APIs. If the documentation shows no native solution, explain the proposed alternative and get the maintainer's approval before editing.
+- Confirm constraints in the current code and documentation before deciding how to implement a change. Ask the maintainer when those sources leave a decision ambiguous.
+- Apply SOLID when it reduces coupling or clarifies ownership. Prefer a direct, focused component over an abstraction that exists only to demonstrate a pattern.
+- Apply DRY when a third copy would otherwise be introduced. Do not create an abstraction for one or two uses unless it clarifies ownership or removes meaningful complexity.
+- Write comments that explain how a function or non-obvious mechanism is used. Keep comments with the code they describe and let clear bindings and structure explain routine behavior.
+- Use POSIX-compatible `sh` for shell commands and scripts, including `['sh', '-c', ...]` when a shell invocation is required.
+- Keep code, comments, and commit messages free of user-specific or environment-specific details such as network names, device names, usernames, hostnames, and absolute home paths.
+
+## Conflicts
+
+When a project rule conflicts with the requested work, stop before editing. Name the rule, explain the conflict, and get explicit maintainer approval for the exception.
