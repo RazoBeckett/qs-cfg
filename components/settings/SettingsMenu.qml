@@ -17,6 +17,7 @@ Item {
 
   property bool open: false
   property int currentTab: 0
+  property var settingsWindow: null
 
   property real introBase: 0.0
   property real introSidebar: 0.0
@@ -328,43 +329,12 @@ Item {
                       onClicked: root.currentTab = index
                     }
 
-                    PopupWindow {
-                      id: tabTip
-                      visible: tabMa.containsMouse && root.mode === 1 && !active
-                      grabFocus: false
-                      color: Colors.transparent
-                      implicitWidth: tipBg.width
-                      implicitHeight: tipBg.height
-
-                      anchor {
-                        item: tabBtn
-                        adjustment: PopupAdjustment.Slide
-                        edges: Edges.Top | Edges.Left
-                        gravity: Edges.Bottom | Edges.Right
-                        rect.x: tabBtn.width + 8
-                        rect.y: Math.round((tabBtn.height - tabTip.implicitHeight) / 2)
-                        rect.width: 1
-                        rect.height: 1
-                      }
-
-                      Rectangle {
-                        id: tipBg
-                        width: tipLabel.implicitWidth + 16
-                        height: tipLabel.implicitHeight + 8
-                        color: Colors.black
-                        border.color: Colors.border
-                        border.width: 1
-                        radius: Settings.rounding.sm
-                        clip: true
-
-                        Label {
-                          id: tipLabel
-                          anchors.centerIn: parent
-                          text: modelData.name
-                          color: Colors.foreground
-                          size: Typography.sizeXS
-                        }
-                      }
+                    Tooltip {
+                      anchorItem: tabBtn
+                      barWindow: root.settingsWindow
+                      placement: "right"
+                      text: modelData.name
+                      hovered: tabMa.containsMouse && root.mode === 1 && !active && root.settingsWindow !== null
                     }
                   }
                 }
@@ -437,7 +407,7 @@ Item {
                 UiTab { visible: root.currentTab === 0; Layout.fillWidth: true }
                 WallpaperTab { id: wallpaperTab; visible: root.currentTab === 1; Layout.fillWidth: true }
                 FontsTab { id: fontsTab; visible: root.currentTab === 2; Layout.fillWidth: true; commitDisplay: root.commitDisplay }
-                AITab { id: aiTab; visible: root.currentTab === 3; Layout.fillWidth: true }
+                AITab { id: aiTab; visible: root.currentTab === 3; Layout.fillWidth: true; settingsWindow: root.settingsWindow }
                 AboutTab { visible: root.currentTab === 4; Layout.fillWidth: true }
 
                 Item { Layout.fillHeight: true; Layout.preferredHeight: 0 }

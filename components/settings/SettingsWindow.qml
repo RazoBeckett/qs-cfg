@@ -61,6 +61,7 @@ Scope {
       id: menu
       anchors.fill: parent
       open: root.open
+      settingsWindow: win
       onCloseFinished: root.open = false
     }
   }

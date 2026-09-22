@@ -4,6 +4,7 @@ import QtQuick
 
 // Hover tooltip mapped from Astryx Tooltip: inverted surface, 200ms
 // hover-intent delay, instant hide, no arrow, short non-interactive text.
+// placement picks the side it opens on: "top", "bottom", "left", "right".
 PopupWindow {
   id: root
 
@@ -12,6 +13,7 @@ PopupWindow {
 
   property string text: ""
   property bool hovered: false
+  property string placement: "bottom"
   property int delay: 200
   property int hideDelay: 0
   property bool useMono: false
@@ -67,16 +69,33 @@ PopupWindow {
     onAnchoring: {
       if (!root.anchorItem || !root.barWindow || !root.barWindow.contentItem) return
 
-      let popupWidth = root.implicitWidth
-      let point = root.barWindow.contentItem.mapFromItem(
-        root.anchorItem,
-        (root.anchorItem.width - popupWidth) / 2,
-        root.anchorItem.height + root.margin
-      )
-      let maxX = root.barWindow.width - popupWidth - root.margin
-
-      tipAnchor.rect.x = Math.round(Math.max(root.margin, Math.min(point.x, maxX)))
-      tipAnchor.rect.y = Math.round(point.y)
+      const pw = root.implicitWidth
+      const ph = root.implicitHeight
+      const m = root.margin
+      let ax = 0, ay = 0
+      if (root.placement === "top") {
+        ax = (root.anchorItem.width - pw) / 2
+        ay = -ph - m
+      } else if (root.placement === "left") {
+        ax = -pw - m
+        ay = (root.anchorItem.height - ph) / 2
+      } else if (root.placement === "right") {
+        ax = root.anchorItem.width + m
+        ay = (root.anchorItem.height - ph) / 2
+      } else {
+        ax = (root.anchorItem.width - pw) / 2
+        ay = root.anchorItem.height + m
+      }
+      const point = root.barWindow.contentItem.mapFromItem(root.anchorItem, ax, ay)
+      if (root.placement === "left" || root.placement === "right") {
+        const maxY = root.barWindow.height - ph - m
+        tipAnchor.rect.x = Math.round(point.x)
+        tipAnchor.rect.y = Math.round(Math.max(m, Math.min(point.y, Math.max(m, maxY))))
+      } else {
+        const maxX = root.barWindow.width - pw - m
+        tipAnchor.rect.x = Math.round(Math.max(m, Math.min(point.x, Math.max(m, maxX))))
+        tipAnchor.rect.y = Math.round(point.y)
+      }
     }
   }
 
@@ -84,10 +103,19 @@ PopupWindow {
     id: holder
     width: bg.width
     height: bg.height
-    y: (1 - root.reveal) * -8
+    x: {
+      if (root.placement === "right") return (1 - root.reveal) * -8
+      if (root.placement === "left") return (1 - root.reveal) * 8
+      return 0
+    }
+    y: {
+      if (root.placement === "bottom") return (1 - root.reveal) * -8
+      if (root.placement === "top") return (1 - root.reveal) * 8
+      return 0
+    }
     scale: 0.95 + 0.05 * root.reveal
     opacity: root.reveal
-    transformOrigin: Item.Top
+    transformOrigin: root.placement === "top" ? Item.Bottom : root.placement === "left" ? Item.Right : root.placement === "right" ? Item.Left : Item.Top
 
     Rectangle {
       id: bg

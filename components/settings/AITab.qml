@@ -11,6 +11,7 @@ ColumnLayout {
   property bool editingKey: false
   property real keyProgress: editingKey ? 1 : 0
   property bool showKey: false
+  property var settingsWindow: null
   readonly property bool editingLang: langField.activeFocus
 
   Behavior on keyProgress { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
@@ -168,6 +169,7 @@ ColumnLayout {
         Layout.preferredHeight: 112
         Layout.alignment: Qt.AlignTop
         counts: root.dayCounts
+        settingsWindow: root.settingsWindow
       }
     }
   }
@@ -499,6 +501,7 @@ ColumnLayout {
   component ContributionGrid: Item {
     id: grid
     property var counts: ({})
+    property var settingsWindow: null
     function localKey(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0") }
     readonly property int weeks: 16
     readonly property int cell: 11
@@ -506,6 +509,20 @@ ColumnLayout {
     // Fixed square grid like the reference, not stretched. Width 221 keeps cells square.
     implicitWidth: weeks * cell + (weeks - 1) * gap
     implicitHeight: 14 + 7 * cell + 6 * gap
+
+    // GitHub layout: each column is one week starting Sunday, row 0 is Sunday.
+    // The last column holds the current week, so its Saturday can lie in the future.
+    function sundayFor(col) {
+      const base = new Date(); base.setHours(0, 0, 0, 0)
+      const s = new Date(base)
+      s.setDate(base.getDate() - base.getDay() - (weeks - 1 - col) * 7)
+      return s
+    }
+    function dateFor(col, row) {
+      const s = sundayFor(col)
+      const dt = new Date(s); dt.setDate(s.getDate() + row)
+      return dt
+    }
 
     function levelFor(k) {
       const n = counts[k] || 0
@@ -559,7 +576,7 @@ ColumnLayout {
       return oklchMix(Colors.surface, Colors.green, 0.22 + 0.78 * t)
     }
 
-    // Three month labels: current month and the two before it, centered to the square grid.
+    // Month labels GitHub-style: label the week column that contains the 1st.
     RowLayout {
       width: grid.weeks * grid.cell + (grid.weeks - 1) * grid.gap
       anchors { horizontalCenter: parent.horizontalCenter; top: parent.top }
@@ -573,20 +590,12 @@ ColumnLayout {
           color: Colors.white
           size: Typography.sizeXS
           text: {
-            const now = new Date(); now.setHours(0,0,0,0)
-            const thresh = 2
-            const d = new Date(now); d.setDate(d.getDate() - (grid.weeks - 1 - index) * 7)
-            const curY = now.getFullYear(), curM = now.getMonth()
-            const y = d.getFullYear(), m = d.getMonth()
-            const diff = (curY - y) * 12 + (curM - m)
-            if (diff < 0 || diff > thresh) return ""
-            if (d.getDate() > 7) return ""
-            const prevIdx = index - 1
-            if (prevIdx >= 0) {
-              const pd = new Date(now); pd.setDate(pd.getDate() - (grid.weeks - 1 - prevIdx) * 7)
-              if (pd.getMonth() === m && pd.getFullYear() === y && pd.getDate() <= 7) return ""
+            const s = grid.sundayFor(index)
+            for (let i = 0; i < 7; i++) {
+              const dt = new Date(s); dt.setDate(s.getDate() + i)
+              if (dt.getDate() === 1) return Qt.formatDate(dt, "MMM")
             }
-            return Qt.formatDate(d, "MMM")
+            return ""
           }
         }
       }
@@ -597,63 +606,54 @@ ColumnLayout {
       anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 14 }
       columns: grid.weeks
       rows: 7
+      flow: GridLayout.TopToBottom
       columnSpacing: grid.gap
       rowSpacing: grid.gap
 
       Repeater {
         model: grid.weeks * 7
         delegate: Rectangle {
+          id: cell
           required property int index
           readonly property int col: Math.floor(index / 7)
           readonly property int row: index % 7
-          readonly property var d: {
-            const base = new Date(); base.setHours(0,0,0,0)
-            const offset = (grid.weeks - 1 - col) * 7 + (6 - row)
-            const todayDow = base.getDay()
-            const shift = 6 - todayDow
-            const dt = new Date(base); dt.setDate(base.getDate() - offset + shift)
-            return dt
+          readonly property var d: grid.dateFor(col, row)
+          readonly property bool future: {
+            const dd = grid.dateFor(col, row)
+            const t = new Date(); t.setHours(0, 0, 0, 0)
+            return dd.getTime() > t.getTime()
           }
-          readonly property string key: grid.localKey(d)
+          readonly property string key: grid.localKey(grid.dateFor(col, row))
           readonly property int lvl: grid.levelFor(key)
+          readonly property string tipText: {
+            const dd = grid.dateFor(col, row)
+            const kk = grid.localKey(dd)
+            const n = grid.counts[kk] || 0
+            const ds = Qt.formatDate(dd, "MMM d, yyyy")
+            return n === 0 ? "No dictates on " + ds : n + (n === 1 ? " dictate on " : " dictates on ") + ds
+          }
           Layout.preferredWidth: grid.cell
           Layout.preferredHeight: grid.cell
           radius: Settings.rounding.sm
-          color: grid.colorFor(lvl)
-          border.width: lvl === 0 ? 1 : 0
+          color: grid.colorFor(grid.levelFor(key))
+          opacity: future ? 0 : 1
+          border.width: future ? 0 : (grid.levelFor(key) === 0 ? 1 : 0)
           border.color: Colors.border
 
           MouseArea {
             id: cellMa
             anchors.fill: parent
             hoverEnabled: true
+            enabled: !future
             cursorShape: Qt.PointingHandCursor
           }
 
-          Rectangle {
-            visible: cellMa.containsMouse
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.top
-            anchors.bottomMargin: 6
-            color: Colors.card
-            border.color: Colors.border
-            border.width: 1
-            radius: Settings.rounding.sm
-            width: tipLabel.implicitWidth + 14
-            height: tipLabel.implicitHeight + 8
-            z: 10
-
-            Label {
-              id: tipLabel
-              anchors.centerIn: parent
-              color: Colors.foreground
-              size: Typography.sizeXS
-              text: {
-                const n = grid.counts[key] || 0
-                const ds = Qt.formatDate(d, "MMM d, yyyy")
-                return n === 0 ? "No dictates on " + ds : n + (n === 1 ? " dictate on " : " dictates on ") + ds
-              }
-            }
+          Tooltip {
+            anchorItem: cell
+            barWindow: grid.settingsWindow
+            placement: "top"
+            text: cell.tipText
+            hovered: cellMa.containsMouse && !cell.future && grid.settingsWindow !== null
           }
         }
       }
