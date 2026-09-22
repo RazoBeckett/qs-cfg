@@ -70,6 +70,8 @@ Item {
     }
   }
 
+  onCurrentTabChanged: settingsFlick.contentY = 0
+
   implicitWidth: 880
   implicitHeight: 600
 
@@ -343,13 +345,29 @@ Item {
               color: Colors.border
             }
 
-            UiTab { visible: root.currentTab === 0; Layout.fillWidth: true }
-            WallpaperTab { id: wallpaperTab; visible: root.currentTab === 1; Layout.fillWidth: true }
-            FontsTab { id: fontsTab; visible: root.currentTab === 2; Layout.fillWidth: true; commitDisplay: root.commitDisplay }
-            AITab { id: aiTab; visible: root.currentTab === 3; Layout.fillWidth: true }
-            AboutTab { visible: root.currentTab === 4; Layout.fillWidth: true }
+            Flickable {
+              id: settingsFlick
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              clip: true
+              contentWidth: width
+              contentHeight: flickContent.implicitHeight
+              boundsBehavior: Flickable.StopAtBounds
 
-            Item { Layout.fillHeight: true }
+              ColumnLayout {
+                id: flickContent
+                width: parent.width
+                spacing: 12
+
+                UiTab { visible: root.currentTab === 0; Layout.fillWidth: true }
+                WallpaperTab { id: wallpaperTab; visible: root.currentTab === 1; Layout.fillWidth: true }
+                FontsTab { id: fontsTab; visible: root.currentTab === 2; Layout.fillWidth: true; commitDisplay: root.commitDisplay }
+                AITab { id: aiTab; visible: root.currentTab === 3; Layout.fillWidth: true }
+                AboutTab { visible: root.currentTab === 4; Layout.fillWidth: true }
+
+                Item { Layout.fillHeight: true; Layout.preferredHeight: 0 }
+              }
+            }
           }
         }
       }
