@@ -6,8 +6,8 @@ import QtQuick.Layouts
 PopupCard {
   id: root
   popoutKind: "battery"
-  contentWidth: 360
-  contentHeight: 148
+  contentWidth: 384
+  contentHeight: 218
 
   readonly property var battery: UPower.displayDevice
   readonly property bool ready: battery != null && battery.isPresent
@@ -88,6 +88,15 @@ PopupCard {
   readonly property double rateRaw: ready ? Number(battery.changeRate) : 0
   readonly property double healthRaw: ready ? Number(battery.healthPercentage) : 0
   readonly property bool healthSupported: ready ? Boolean(battery.healthSupported) : false
+  readonly property var profiles: [
+    { profile: PowerProfile.PowerSaver, label: "Power Save", icon: "leaf" },
+    { profile: PowerProfile.Balanced, label: "Balanced", icon: "scales" },
+    { profile: PowerProfile.Performance, label: "Performance", icon: "lightning" }
+  ]
+  readonly property int activeProfileIndex: {
+    for (let i = 0; i < profiles.length; i++) if (PowerProfiles.profile === profiles[i].profile) return i
+    return -1
+  }
 
   function formatRate(v) {
     if (!ready || isNaN(v) || Math.abs(v) < 0.05) return "—"
@@ -113,8 +122,8 @@ PopupCard {
 
   Rectangle {
     id: bg
-    width: 360
-    height: 148
+    width: 384
+    height: 218
     color: Colors.background
     border.color: Colors.border
     border.width: 1
@@ -125,9 +134,9 @@ PopupCard {
       anchors.fill: parent
       anchors.leftMargin: 16
       anchors.rightMargin: 16
-      anchors.topMargin: 14
-      anchors.bottomMargin: 12
-      spacing: 10
+      anchors.topMargin: 16
+      anchors.bottomMargin: 14
+      spacing: 14
 
       RowLayout {
         Layout.fillWidth: true
@@ -244,6 +253,81 @@ PopupCard {
         Connections {
           target: root
           function onIsChargingChanged() { if (!root.isCharging) { energyFill.scale = 1; energyGlow.opacity = 0.18 } }
+        }
+      }
+
+      // Power profiles via the native PowerProfiles service; Performance dims when unsupported
+      Rectangle {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 44
+        radius: Settings.rounding.md
+        color: Colors.transparent
+        border.color: Colors.border
+        border.width: 1
+
+        Rectangle {
+          id: profileHighlight
+          visible: root.activeProfileIndex >= 0
+          width: (parent.width - 20) / 3
+          height: 32
+          x: 6 + root.activeProfileIndex * (width + 4)
+          y: 6
+          color: Colors.card
+          border.color: Colors.blue
+          border.width: 1
+          radius: Settings.rounding.sm
+          Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+          Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+        }
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: 6
+          anchors.rightMargin: 6
+          anchors.topMargin: 6
+          anchors.bottomMargin: 6
+          spacing: 4
+
+          Repeater {
+            model: root.profiles
+            delegate: Rectangle {
+              id: chip
+              required property var modelData
+              readonly property bool isActive: PowerProfiles.profile === modelData.profile
+              readonly property bool isUnavailable: modelData.profile === PowerProfile.Performance && !PowerProfiles.hasPerformanceProfile
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              radius: Settings.rounding.sm
+              color: chipMa.pressed ? Colors.card : (chipMa.containsMouse && !isActive) ? Colors.surface : Colors.transparent
+              opacity: isUnavailable ? 0.4 : 1
+
+              RowLayout {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                  text: chip.modelData.icon
+                  color: chip.isActive ? Colors.blue : Colors.white
+                  font.family: Typography.icons.family
+                  font.pixelSize: 15
+                }
+
+                Label {
+                  text: chip.modelData.label
+                  color: chip.isActive ? Colors.blue : (chipMa.containsMouse ? Colors.foreground : Colors.white)
+                }
+              }
+
+              MouseArea {
+                id: chipMa
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                enabled: !chip.isUnavailable
+                onClicked: PowerProfiles.profile = chip.modelData.profile
+              }
+            }
+          }
         }
       }
 
