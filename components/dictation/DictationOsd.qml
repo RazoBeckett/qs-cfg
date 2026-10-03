@@ -240,7 +240,6 @@ Scope {
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         tone: Colors.blue
         glyph: "brain"
-        iconOnly: true
         loadingMode: true
         cancellable: true
         onCancelled: Dictation.cancel()
@@ -252,7 +251,6 @@ Scope {
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         tone: Colors.yellow
         glyph: "keyboard"
-        iconOnly: true
         loadingMode: true
         faceActive: root.shown && root.displayState === "typing"
       }
@@ -316,8 +314,6 @@ Scope {
     property string glyph: ""
     property color tone: Colors.foreground
     property string label: ""
-    // Icon-only faces show the glyph and no word.
-    property bool iconOnly: false
     property bool loadingMode: false
     property bool faceActive: false
     property bool cancellable: false
@@ -333,8 +329,8 @@ Scope {
     Text {
       visible: statusFace.glyph !== ""
       text: statusFace.glyph
-      // Neutral on the icon-only faces so the tone lives in the bars.
-      color: statusFace.iconOnly ? Colors.foreground : statusFace.tone
+      // Neutral so the tone lives in the bars.
+      color: statusFace.loadingMode ? Colors.foreground : statusFace.tone
       font.family: Typography.icons.family
       font.pixelSize: 18
     }
@@ -347,13 +343,12 @@ Scope {
       Layout.preferredHeight: 32
       Layout.alignment: Qt.AlignVCenter
       barCount: 9
-      idle: "static"
       loading: statusFace.loadingMode && statusFace.faceActive
       barColor: statusFace.tone
     }
 
     Label {
-      visible: !statusFace.iconOnly
+      visible: !statusFace.loadingMode
       text: statusFace.label
       color: statusFace.tone
       weight: Font.Medium
