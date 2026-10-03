@@ -23,7 +23,6 @@ Scope {
   property real rise: 0
   property real fade: 0
   property bool expanded: false
-  property bool contentReady: false
   property bool closing: false
   property int elapsedSec: 0
 
@@ -62,14 +61,6 @@ Scope {
 
   onShownChanged: shown ? showOsd() : hideOsd()
 
-  onExpandedChanged: {
-    if (root.expanded) contentTimer.restart()
-    else {
-      contentTimer.stop()
-      root.contentReady = false
-    }
-  }
-
   onDisplayStateChanged: if (root.displayState === "error") errorPulse.restart()
 
   function showOsd(): void {
@@ -78,16 +69,12 @@ Scope {
     errorPulse.stop()
     pill.scale = 1
     root.closing = false
-    root.expanded = false
-    root.contentReady = false
+    root.expanded = true
     openSequence.restart()
-    expandTimer.restart()
   }
 
   function hideOsd(): void {
     openSequence.stop()
-    expandTimer.stop()
-    contentTimer.stop()
     errorPulse.stop()
     pill.scale = 1
     root.closing = true
@@ -137,18 +124,6 @@ Scope {
     PauseAnimation { duration: 300 }
     NumberAnimation { target: pill; property: "scale"; to: 1.035; duration: 135; easing.type: Easing.OutCubic }
     NumberAnimation { target: pill; property: "scale"; to: 1.0; duration: 165; easing.type: Easing.OutCubic }
-  }
-
-  Timer {
-    id: expandTimer
-    interval: 360
-    onTriggered: root.expanded = true
-  }
-
-  Timer {
-    id: contentTimer
-    interval: 100
-    onTriggered: root.contentReady = true
   }
 
   Timer {
@@ -205,51 +180,21 @@ Scope {
 
       HoverHandler { id: pillHover }
 
-      // One microphone for the whole entrance: centered in the bubble, then
-      // riding the left edge into the recording face. Only the color breathes.
-      Text {
-        id: heroMic
-        anchors.verticalCenter: parent.verticalCenter
-        x: root.expanded ? 14 : (pill.width - width) / 2
-        width: 20
-        horizontalAlignment: Text.AlignHCenter
-        text: "microphone"
-        color: Colors.red
-        font.family: Typography.icons.family
-        font.pixelSize: 20
-        opacity: (!root.expanded || root.displayState === "recording") ? 1 : 0
-
-        Behavior on x {
-          enabled: root.shown
-          NumberAnimation { duration: 420; easing.type: Easing.OutBack; easing.overshoot: 1.18 }
-        }
-        Behavior on opacity { NumberAnimation { duration: 180 } }
-
-        SequentialAnimation {
-          running: heroMic.opacity > 0
-          loops: Animation.Infinite
-          ColorAnimation { target: heroMic; property: "color"; from: Qt.darker(Colors.red, 2.0); to: Qt.lighter(Colors.red, 1.12); duration: 950; easing.type: Easing.InOutSine }
-          ColorAnimation { target: heroMic; property: "color"; from: Qt.lighter(Colors.red, 1.12); to: Qt.darker(Colors.red, 2.0); duration: 950; easing.type: Easing.InOutSine }
-        }
-      }
-
       RowLayout {
         id: recordingFace
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         spacing: 10
-        opacity: root.contentReady && root.displayState === "recording" ? 1 : 0
-        scale: root.contentReady && root.displayState === "recording" ? 1 : 0.92
+        opacity: root.shown && root.displayState === "recording" ? 1 : 0
+        scale: root.shown && root.displayState === "recording" ? 1 : 0.92
         Behavior on opacity { NumberAnimation { duration: 220 } }
         Behavior on scale { NumberAnimation { duration: 400; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
 
-        // Slot for the shared hero microphone, which lives outside the faces.
-        Item { Layout.preferredWidth: 20; Layout.preferredHeight: 20 }
-
-        Waveform {
-          Layout.preferredWidth: 120
-          Layout.preferredHeight: 26
+        BarVisualizer {
+          Layout.preferredWidth: 78
+          Layout.preferredHeight: 32
           Layout.alignment: Qt.AlignVCenter
-          active: root.contentReady && Dictation.state === "recording"
+          barCount: 9
+          active: root.shown && Dictation.state === "recording"
           level: Dictation.voiceLevel
         }
 
@@ -294,21 +239,22 @@ Scope {
         id: transcribingFace
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         tone: Colors.blue
-        label: "Transcribing"
-        conic: true
+        glyph: "brain"
+        iconOnly: true
+        loadingMode: true
         cancellable: true
         onCancelled: Dictation.cancel()
-        faceActive: root.contentReady && root.displayState === "transcribing"
+        faceActive: root.shown && root.displayState === "transcribing"
       }
 
       StatusFace {
         id: typingFace
         anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
         tone: Colors.yellow
-        label: "Typing"
-        conic: true
-        yellow: true
-        faceActive: root.contentReady && root.displayState === "typing"
+        glyph: "keyboard"
+        iconOnly: true
+        loadingMode: true
+        faceActive: root.shown && root.displayState === "typing"
       }
 
       StatusFace {
@@ -317,7 +263,7 @@ Scope {
         glyph: "check"
         tone: Colors.green
         label: Dictation.lastAction === "copied" ? "Copied" : "Pasted"
-        faceActive: root.contentReady && root.displayState === "done"
+        faceActive: root.shown && root.displayState === "done"
       }
 
       StatusFace {
@@ -326,7 +272,7 @@ Scope {
         glyph: "smiley-blank"
         tone: Colors.red
         label: "No speech detected"
-        faceActive: root.contentReady && root.displayState === "error"
+        faceActive: root.shown && root.displayState === "error"
       }
     }
   }
@@ -370,8 +316,9 @@ Scope {
     property string glyph: ""
     property color tone: Colors.foreground
     property string label: ""
-    property bool conic: false
-    property bool yellow: false
+    // Icon-only faces show the glyph and no word.
+    property bool iconOnly: false
+    property bool loadingMode: false
     property bool faceActive: false
     property bool cancellable: false
     signal cancelled()
@@ -382,61 +329,31 @@ Scope {
     Behavior on opacity { NumberAnimation { duration: 220 } }
     Behavior on scale { NumberAnimation { duration: 400; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
 
-    Item {
-      Layout.preferredWidth: 20
-      Layout.preferredHeight: 20
-      visible: statusFace.conic
-
-      Canvas {
-        anchors.fill: parent
-        onPaint: {
-          const ctx = getContext("2d")
-          const c = width / 2
-          ctx.clearRect(0, 0, width, height)
-          ctx.reset()
-          const grad = ctx.createConicalGradient(c, c, 0)
-          if (statusFace.yellow) {
-            grad.addColorStop(0, Colors.yellow.toString())
-            grad.addColorStop(0.33, Qt.lighter(Colors.yellow, 1.18).toString())
-            grad.addColorStop(0.66, Qt.darker(Colors.yellow, 1.12).toString())
-            grad.addColorStop(1, Colors.yellow.toString())
-          } else {
-            grad.addColorStop(0, Colors.magenta.toString())
-            grad.addColorStop(0.33, Colors.blue.toString())
-            grad.addColorStop(0.66, Colors.cyan.toString())
-            grad.addColorStop(1, Colors.magenta.toString())
-          }
-          ctx.fillStyle = grad
-          ctx.beginPath()
-          ctx.arc(c, c, c, 0, Math.PI * 2)
-          ctx.fill()
-          // Punch the middle out, like the CSS ::before circle.
-          ctx.globalCompositeOperation = "destination-out"
-          ctx.beginPath()
-          ctx.arc(c, c, c * 0.72, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.globalCompositeOperation = "source-over"
-        }
-
-        RotationAnimation on rotation {
-          running: statusFace.faceActive
-          loops: Animation.Infinite
-          from: 0
-          to: 360
-          duration: 1400
-        }
-      }
-    }
-
+    // Icon takes the spinner's old spot at the left of the face.
     Text {
-      visible: !statusFace.conic
+      visible: statusFace.glyph !== ""
       text: statusFace.glyph
-      color: statusFace.tone
+      // Neutral on the icon-only faces so the tone lives in the bars.
+      color: statusFace.iconOnly ? Colors.foreground : statusFace.tone
       font.family: Typography.icons.family
       font.pixelSize: 18
     }
 
+    // Loading faces run the bar sweep in their tone color. There is no
+    // mic signal during transcribing or typing, so level stays silent.
+    BarVisualizer {
+      visible: statusFace.loadingMode
+      Layout.preferredWidth: 78
+      Layout.preferredHeight: 32
+      Layout.alignment: Qt.AlignVCenter
+      barCount: 9
+      idle: "static"
+      loading: statusFace.loadingMode && statusFace.faceActive
+      barColor: statusFace.tone
+    }
+
     Label {
+      visible: !statusFace.iconOnly
       text: statusFace.label
       color: statusFace.tone
       weight: Font.Medium
