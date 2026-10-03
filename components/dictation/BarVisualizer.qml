@@ -110,7 +110,7 @@ Item {
       width: root.barWidth
       height: Math.max(root.minLevel, root.levels[index] || 0) * root.height
       y: Math.max(0, (root.height - height) / 2)
-      radius: width / 2
+      radius: Settings.rounding.sm
       color: root.barColor
     }
   }
