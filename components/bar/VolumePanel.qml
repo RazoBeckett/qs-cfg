@@ -1,5 +1,6 @@
 import "../.."
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 import QtQuick.Layouts
@@ -200,6 +201,100 @@ PopupCard {
     Pipewire.preferredDefaultAudioSource = node
   }
 
+  property int currentTab: 0
+  readonly property var audioTabs: ["Mixer", "Output", "Input", "Config"]
+  property var pactlData: ({ sinks: [], sources: [], cards: [] })
+  property bool pactlReady: false
+  property string expandedPortNode: ""
+  property string expandedCard: ""
+
+  readonly property var audioCards: pactlReady ? pactlData.cards : []
+
+  function refreshPactl() {
+    if (!pactlProc.running) pactlProc.running = true
+  }
+
+  function pactlEntry(list, name) {
+    for (let i = 0; i < list.length; i++) if (list[i] && list[i].name === name) return list[i]
+    return null
+  }
+
+  // Port and profile data lives outside the Pipewire QML service, so it
+  // comes from `pactl -f json list`, joined to nodes by node name.
+  function nodePorts(node, isSink) {
+    if (!node) return []
+    let info = pactlEntry(isSink ? pactlData.sinks : pactlData.sources, node.name)
+    if (!info || !info.ports) return []
+    return info.ports
+  }
+
+  function nodeActivePort(node, isSink) {
+    if (!node) return ""
+    let info = pactlEntry(isSink ? pactlData.sinks : pactlData.sources, node.name)
+    return info ? (info.active_port || "") : ""
+  }
+
+  function portDescription(ports, name) {
+    for (let i = 0; i < ports.length; i++) if (ports[i] && ports[i].name === name) return ports[i].description || name
+    return name || "-"
+  }
+
+  function setNodeFraction(node, f) {
+    if (!node || !node.audio) return
+    let clamped = Math.max(0, Math.min(1, f))
+    node.audio.volume = clamped
+    if (node.audio.muted && clamped > 0) node.audio.muted = false
+  }
+
+  function toggleNodeMute(node) {
+    if (!node || !node.audio) return
+    node.audio.muted = !node.audio.muted
+  }
+
+  function setSinkPort(sinkName, portName) {
+    if (!sinkName || !portName) return
+    Quickshell.execDetached(["pactl", "set-sink-port", sinkName, portName])
+    expandedPortNode = ""
+    pactlRefreshTimer.restart()
+  }
+
+  function setSourcePort(sourceName, portName) {
+    if (!sourceName || !portName) return
+    Quickshell.execDetached(["pactl", "set-source-port", sourceName, portName])
+    expandedPortNode = ""
+    pactlRefreshTimer.restart()
+  }
+
+  function cardLabel(card) {
+    if (!card) return "Unknown"
+    let p = card.properties || {}
+    return p["device.description"] || card.name || "Unknown"
+  }
+
+  function cardProfiles(card) {
+    let out = []
+    if (!card || !card.profiles) return out
+    for (let key in card.profiles) {
+      let pr = card.profiles[key]
+      out.push({ name: key, description: pr ? (pr.description || key) : key, available: pr ? pr.available !== false : true })
+    }
+    return out
+  }
+
+  function cardProfileDescription(card) {
+    if (!card) return "-"
+    let list = cardProfiles(card)
+    for (let i = 0; i < list.length; i++) if (list[i].name === card.active_profile) return list[i].description
+    return card.active_profile || "-"
+  }
+
+  function setCardProfile(cardName, profile) {
+    if (!cardName || !profile) return
+    Quickshell.execDetached(["pactl", "set-card-profile", cardName, profile])
+    expandedCard = ""
+    pactlRefreshTimer.restart()
+  }
+
   PwObjectTracker { objects: root.candidateSinks }
   PwObjectTracker { objects: root.candidateSources }
   PwObjectTracker { objects: root.audioStreams }
@@ -214,6 +309,57 @@ PopupCard {
     id: inPeakMonitor
     node: root.source
     enabled: root.open && root.sourceReady
+  }
+
+  Process {
+    id: pactlProc
+    command: ["pactl", "-f", "json", "list"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          let data = JSON.parse(text || "")
+          root.pactlData = {
+            sinks: data.sinks || [],
+            sources: data.sources || [],
+            cards: data.cards || []
+          }
+          root.pactlReady = true
+        } catch (e) {
+          root.pactlReady = false
+        }
+      }
+    }
+  }
+
+  Timer {
+    id: pactlRefreshTimer
+    interval: 600
+    onTriggered: root.refreshPactl()
+  }
+
+  Timer {
+    interval: 3000
+    running: root.open && root.currentTab !== 0
+    repeat: true
+    onTriggered: root.refreshPactl()
+  }
+
+  onOpenChanged: if (open) root.refreshPactl()
+
+  // Reset after the close fade finishes (showing), not when open flips,
+  // so the panel never flashes back to Mixer on the way out.
+  onShowingChanged: {
+    if (!showing) {
+      currentTab = 0
+      expandedPortNode = ""
+      expandedCard = ""
+    }
+  }
+
+  onCurrentTabChanged: {
+    expandedPortNode = ""
+    expandedCard = ""
+    if (open && currentTab !== 0) refreshPactl()
   }
 
   Rectangle {
@@ -242,6 +388,13 @@ PopupCard {
           size: Typography.sizeMD
         }
         Item { Layout.fillWidth: true }
+        SegmentedControl {
+          segments: root.audioTabs
+          currentIndex: root.currentTab
+          onSelected: i => root.currentTab = i
+          Layout.alignment: Qt.AlignVCenter
+          Layout.preferredWidth: 224
+        }
       }
 
       Rectangle {
@@ -270,6 +423,7 @@ PopupCard {
             Layout.rightMargin: 16
             Layout.topMargin: 12
             spacing: 8
+            visible: root.currentTab === 0
 
             Label {
               text: "OUTPUT"
@@ -410,6 +564,7 @@ PopupCard {
             Layout.preferredHeight: 1
             Layout.topMargin: 12
             color: Colors.border
+            visible: root.currentTab === 0
           }
 
           // input section
@@ -419,7 +574,7 @@ PopupCard {
             Layout.rightMargin: 16
             Layout.topMargin: 12
             spacing: 8
-            visible: root.source !== null || root.audioSources.length > 0
+            visible: (root.source !== null || root.audioSources.length > 0) && root.currentTab === 0
 
             Label {
               text: "INPUT"
@@ -567,7 +722,7 @@ PopupCard {
             Layout.preferredHeight: 1
             Layout.topMargin: 12
             color: Colors.border
-            visible: root.audioStreams.length > 0
+            visible: root.audioStreams.length > 0 && root.currentTab === 0
           }
 
           // per-app streams
@@ -578,7 +733,7 @@ PopupCard {
             Layout.topMargin: 12
             Layout.bottomMargin: 16
             spacing: 8
-            visible: root.audioStreams.length > 0
+            visible: root.audioStreams.length > 0 && root.currentTab === 0
 
             Label {
               text: "APPS"
@@ -696,6 +851,727 @@ PopupCard {
                   }
                 }
               }
+            }
+          }
+
+          // output devices tab
+          ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 12
+            Layout.bottomMargin: 16
+            spacing: 8
+            visible: root.currentTab === 1
+
+            Label {
+              text: "OUTPUT DEVICES"
+              color: Colors.white
+              size: Typography.sizeXS
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 8
+
+              Repeater {
+                model: ScriptModel {
+                  values: root.showing && root.currentTab === 1 ? root.audioSinks : []
+                }
+                delegate: Rectangle {
+                  required property var modelData
+                  required property int index
+                  readonly property var devNode: modelData
+                  readonly property bool isActive: root.sink && devNode && root.sink.id === devNode.id
+                  readonly property bool dMuted: devNode && devNode.audio ? devNode.audio.muted : false
+                  readonly property real dVol: devNode && devNode.audio ? devNode.audio.volume : 0
+                  readonly property real dFraction: dMuted ? 0 : Math.max(0, Math.min(1, dVol))
+                  readonly property var dPorts: root.nodePorts(devNode, true)
+                  readonly property string dActivePort: root.nodeActivePort(devNode, true)
+                  readonly property bool portsOpen: root.expandedPortNode === (devNode ? devNode.name : "")
+                  Layout.fillWidth: true
+                  Layout.preferredHeight: devCardCol.implicitHeight + 16
+                  radius: Settings.rounding.md
+                  color: Colors.card
+                  border.color: isActive ? Colors.blue : Colors.border
+                  border.width: 1
+
+                  ColumnLayout {
+                    id: devCardCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    anchors.topMargin: 8
+                    spacing: 6
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Text {
+                        text: root.sinkIcon(devNode)
+                        color: isActive ? Colors.blue : Colors.foreground
+                        font.family: Typography.icons.family
+                        font.pixelSize: 16
+                      }
+
+                      Label {
+                        text: root.nodeLabel(devNode)
+                        color: Colors.foreground
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                      }
+
+                      Rectangle {
+                        width: 28
+                        height: 28
+                        radius: Settings.rounding.sm
+                        color: isActive ? Colors.blue : (defMa.containsMouse ? Colors.surface : Colors.transparent)
+                        border.color: isActive ? Colors.blue : Colors.border
+                        border.width: 1
+                        Text {
+                          anchors.centerIn: parent
+                          text: "check"
+                          color: isActive ? Colors.black : Colors.white
+                          font.family: Typography.icons.family
+                          font.pixelSize: 14
+                        }
+                        MouseArea {
+                          id: defMa
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.setDefaultSink(devNode)
+                        }
+                      }
+
+                      Rectangle {
+                        width: 28
+                        height: 28
+                        radius: Settings.rounding.sm
+                        color: devMuteMa.containsMouse ? Colors.surface : Colors.transparent
+                        border.color: Colors.border
+                        border.width: 1
+                        Text {
+                          anchors.centerIn: parent
+                          text: dMuted ? "speaker-slash" : "speaker-high"
+                          color: dMuted ? Colors.white : Colors.foreground
+                          font.family: Typography.icons.family
+                          font.pixelSize: 14
+                        }
+                        MouseArea {
+                          id: devMuteMa
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.toggleNodeMute(devNode)
+                        }
+                      }
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Slider {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 20
+                        fraction: dFraction
+                        ready: devNode && devNode.ready
+                        trackHeight: 4
+                        thumbBaseWidth: 18
+                        thumbBaseHeight: 12
+                        fillColor: dMuted ? Colors.white : Colors.blue
+                        onMoved: f => root.setNodeFraction(devNode, f)
+                      }
+
+                      Label {
+                        text: dMuted ? "0%" : Math.round(dVol * 100) + "%"
+                        color: Colors.white
+                        useMono: true
+                        size: Typography.sizeXS
+                        Layout.preferredWidth: 36
+                        horizontalAlignment: Text.AlignRight
+                      }
+                    }
+
+                    ObsMeter {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: 9
+                      peaks: devPeak.peaks
+                      muted: dMuted
+                      showTicks: false
+                    }
+
+                    ColumnLayout {
+                      visible: dPorts.length > 0
+                      Layout.fillWidth: true
+                      spacing: 4
+
+                      RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Label {
+                          text: "Port:"
+                          color: Colors.white
+                          size: Typography.sizeXS
+                        }
+
+                        Rectangle {
+                          Layout.fillWidth: true
+                          Layout.preferredHeight: 28
+                          radius: Settings.rounding.sm
+                          color: portMa.containsMouse ? Colors.surface : Colors.background
+                          border.color: Colors.border
+                          border.width: 1
+
+                          RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 6
+
+                            Label {
+                              text: root.portDescription(dPorts, dActivePort)
+                              color: Colors.foreground
+                              size: Typography.sizeXS
+                              elide: Text.ElideRight
+                              Layout.fillWidth: true
+                            }
+
+                            Text {
+                              text: portsOpen ? "caret-up" : "caret-down"
+                              color: Colors.white
+                              font.family: Typography.icons.family
+                              font.pixelSize: 12
+                            }
+                          }
+
+                          MouseArea {
+                            id: portMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.expandedPortNode = portsOpen ? "" : devNode.name
+                          }
+                        }
+                      }
+
+                      ColumnLayout {
+                        visible: portsOpen
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Repeater {
+                          model: dPorts
+                          delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            readonly property bool isCurrent: modelData.name === dActivePort
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            radius: Settings.rounding.sm
+                            color: optMa.containsMouse && !isCurrent ? Colors.surface : Colors.transparent
+
+                            RowLayout {
+                              anchors.fill: parent
+                              anchors.leftMargin: 8
+                              anchors.rightMargin: 8
+                              spacing: 8
+
+                              Label {
+                                text: modelData.description || modelData.name
+                                color: isCurrent ? Colors.blue : Colors.foreground
+                                size: Typography.sizeXS
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                              }
+
+                              Text {
+                                visible: isCurrent
+                                text: "check"
+                                color: Colors.blue
+                                font.family: Typography.icons.family
+                                font.pixelSize: 12
+                              }
+                            }
+
+                            MouseArea {
+                              id: optMa
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: root.setSinkPort(devNode.name, modelData.name)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  PwNodePeakMonitor {
+                    id: devPeak
+                    node: devNode
+                    enabled: root.open && root.currentTab === 1 && devNode && devNode.ready
+                  }
+                }
+              }
+            }
+
+            Label {
+              visible: root.audioSinks.length === 0
+              text: "No output devices found"
+              color: Colors.white
+            }
+          }
+
+          // input devices tab
+          ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 12
+            Layout.bottomMargin: 16
+            spacing: 8
+            visible: root.currentTab === 2
+
+            Label {
+              text: "INPUT DEVICES"
+              color: Colors.white
+              size: Typography.sizeXS
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 8
+
+              Repeater {
+                model: ScriptModel {
+                  values: root.showing && root.currentTab === 2 ? root.audioSources : []
+                }
+                delegate: Rectangle {
+                  required property var modelData
+                  required property int index
+                  readonly property var devNode: modelData
+                  readonly property bool isActive: root.source && devNode && root.source.id === devNode.id
+                  readonly property bool dMuted: devNode && devNode.audio ? devNode.audio.muted : false
+                  readonly property real dVol: devNode && devNode.audio ? devNode.audio.volume : 0
+                  readonly property real dFraction: dMuted ? 0 : Math.max(0, Math.min(1, dVol))
+                  readonly property var dPorts: root.nodePorts(devNode, false)
+                  readonly property string dActivePort: root.nodeActivePort(devNode, false)
+                  readonly property bool portsOpen: root.expandedPortNode === (devNode ? devNode.name : "")
+                  Layout.fillWidth: true
+                  Layout.preferredHeight: inCardCol.implicitHeight + 16
+                  radius: Settings.rounding.md
+                  color: Colors.card
+                  border.color: isActive ? Colors.blue : Colors.border
+                  border.width: 1
+
+                  ColumnLayout {
+                    id: inCardCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    anchors.topMargin: 8
+                    spacing: 6
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Text {
+                        text: root.sourceIcon(devNode)
+                        color: isActive ? Colors.blue : Colors.foreground
+                        font.family: Typography.icons.family
+                        font.pixelSize: 16
+                      }
+
+                      Label {
+                        text: root.nodeLabel(devNode)
+                        color: Colors.foreground
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                      }
+
+                      Rectangle {
+                        width: 28
+                        height: 28
+                        radius: Settings.rounding.sm
+                        color: isActive ? Colors.blue : (inDefMa.containsMouse ? Colors.surface : Colors.transparent)
+                        border.color: isActive ? Colors.blue : Colors.border
+                        border.width: 1
+                        Text {
+                          anchors.centerIn: parent
+                          text: "check"
+                          color: isActive ? Colors.black : Colors.white
+                          font.family: Typography.icons.family
+                          font.pixelSize: 14
+                        }
+                        MouseArea {
+                          id: inDefMa
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.setDefaultSource(devNode)
+                        }
+                      }
+
+                      Rectangle {
+                        width: 28
+                        height: 28
+                        radius: Settings.rounding.sm
+                        color: inMuteMa.containsMouse ? Colors.surface : Colors.transparent
+                        border.color: Colors.border
+                        border.width: 1
+                        Text {
+                          anchors.centerIn: parent
+                          text: dMuted ? "microphone-slash" : "microphone"
+                          color: dMuted ? Colors.white : Colors.foreground
+                          font.family: Typography.icons.family
+                          font.pixelSize: 14
+                        }
+                        MouseArea {
+                          id: inMuteMa
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.toggleNodeMute(devNode)
+                        }
+                      }
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Slider {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 20
+                        fraction: dFraction
+                        ready: devNode && devNode.ready
+                        trackHeight: 4
+                        thumbBaseWidth: 18
+                        thumbBaseHeight: 12
+                        fillColor: dMuted ? Colors.white : Colors.blue
+                        onMoved: f => root.setNodeFraction(devNode, f)
+                      }
+
+                      Label {
+                        text: dMuted ? "0%" : Math.round(dVol * 100) + "%"
+                        color: Colors.white
+                        useMono: true
+                        size: Typography.sizeXS
+                        Layout.preferredWidth: 36
+                        horizontalAlignment: Text.AlignRight
+                      }
+                    }
+
+                    ObsMeter {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: 9
+                      peaks: inPeak.peaks
+                      muted: dMuted
+                      showTicks: false
+                    }
+
+                    ColumnLayout {
+                      visible: dPorts.length > 0
+                      Layout.fillWidth: true
+                      spacing: 4
+
+                      RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Label {
+                          text: "Port:"
+                          color: Colors.white
+                          size: Typography.sizeXS
+                        }
+
+                        Rectangle {
+                          Layout.fillWidth: true
+                          Layout.preferredHeight: 28
+                          radius: Settings.rounding.sm
+                          color: inPortMa.containsMouse ? Colors.surface : Colors.background
+                          border.color: Colors.border
+                          border.width: 1
+
+                          RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 6
+
+                            Label {
+                              text: root.portDescription(dPorts, dActivePort)
+                              color: Colors.foreground
+                              size: Typography.sizeXS
+                              elide: Text.ElideRight
+                              Layout.fillWidth: true
+                            }
+
+                            Text {
+                              text: portsOpen ? "caret-up" : "caret-down"
+                              color: Colors.white
+                              font.family: Typography.icons.family
+                              font.pixelSize: 12
+                            }
+                          }
+
+                          MouseArea {
+                            id: inPortMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.expandedPortNode = portsOpen ? "" : devNode.name
+                          }
+                        }
+                      }
+
+                      ColumnLayout {
+                        visible: portsOpen
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Repeater {
+                          model: dPorts
+                          delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            readonly property bool isCurrent: modelData.name === dActivePort
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            radius: Settings.rounding.sm
+                            color: inOptMa.containsMouse && !isCurrent ? Colors.surface : Colors.transparent
+
+                            RowLayout {
+                              anchors.fill: parent
+                              anchors.leftMargin: 8
+                              anchors.rightMargin: 8
+                              spacing: 8
+
+                              Label {
+                                text: modelData.description || modelData.name
+                                color: isCurrent ? Colors.blue : Colors.foreground
+                                size: Typography.sizeXS
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                              }
+
+                              Text {
+                                visible: isCurrent
+                                text: "check"
+                                color: Colors.blue
+                                font.family: Typography.icons.family
+                                font.pixelSize: 12
+                              }
+                            }
+
+                            MouseArea {
+                              id: inOptMa
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: root.setSourcePort(devNode.name, modelData.name)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  PwNodePeakMonitor {
+                    id: inPeak
+                    node: devNode
+                    enabled: root.open && root.currentTab === 2 && devNode && devNode.ready
+                  }
+                }
+              }
+            }
+
+            Label {
+              visible: root.audioSources.length === 0
+              text: "No input devices found"
+              color: Colors.white
+            }
+          }
+
+          // configuration tab
+          ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 12
+            Layout.bottomMargin: 16
+            spacing: 8
+            visible: root.currentTab === 3
+
+            Label {
+              text: "CONFIGURATION"
+              color: Colors.white
+              size: Typography.sizeXS
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 8
+              visible: root.pactlReady
+
+              Repeater {
+                model: ScriptModel {
+                  values: root.showing && root.currentTab === 3 ? root.audioCards : []
+                }
+                delegate: Rectangle {
+                  required property var modelData
+                  required property int index
+                  readonly property var cfgCard: modelData
+                  readonly property var cProfiles: root.cardProfiles(modelData)
+                  readonly property bool cardOpen: root.expandedCard === (modelData ? modelData.name : "")
+                  Layout.fillWidth: true
+                  Layout.preferredHeight: cfgCardCol.implicitHeight + 16
+                  radius: Settings.rounding.md
+                  color: Colors.card
+                  border.color: Colors.border
+                  border.width: 1
+
+                  ColumnLayout {
+                    id: cfgCardCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    anchors.topMargin: 8
+                    spacing: 6
+
+                    Label {
+                      text: root.cardLabel(cfgCard)
+                      color: Colors.foreground
+                      elide: Text.ElideRight
+                      Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Label {
+                        text: "Profile:"
+                        color: Colors.white
+                        size: Typography.sizeXS
+                      }
+
+                      Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 28
+                        radius: Settings.rounding.sm
+                        color: cfgProfMa.containsMouse ? Colors.surface : Colors.background
+                        border.color: Colors.border
+                        border.width: 1
+
+                        RowLayout {
+                          anchors.fill: parent
+                          anchors.leftMargin: 8
+                          anchors.rightMargin: 8
+                          spacing: 6
+
+                          Label {
+                            text: root.cardProfileDescription(cfgCard)
+                            color: Colors.foreground
+                            size: Typography.sizeXS
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                          }
+
+                          Text {
+                            text: cardOpen ? "caret-up" : "caret-down"
+                            color: Colors.white
+                            font.family: Typography.icons.family
+                            font.pixelSize: 12
+                          }
+                        }
+
+                        MouseArea {
+                          id: cfgProfMa
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.expandedCard = cardOpen ? "" : cfgCard.name
+                        }
+                      }
+                    }
+
+                    ColumnLayout {
+                      visible: cardOpen
+                      Layout.fillWidth: true
+                      spacing: 2
+
+                      Repeater {
+                        model: cProfiles
+                        delegate: Rectangle {
+                          required property var modelData
+                          required property int index
+                          readonly property bool isCurrent: modelData.name === cfgCard.active_profile
+                          Layout.fillWidth: true
+                          Layout.preferredHeight: 28
+                          radius: Settings.rounding.sm
+                          color: cfgOptMa.containsMouse && !isCurrent ? Colors.surface : Colors.transparent
+                          opacity: modelData.available ? 1 : 0.45
+
+                          RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 8
+
+                            Label {
+                              text: modelData.description || modelData.name
+                              color: isCurrent ? Colors.blue : Colors.foreground
+                              size: Typography.sizeXS
+                              elide: Text.ElideRight
+                              Layout.fillWidth: true
+                            }
+
+                            Text {
+                              visible: isCurrent
+                              text: "check"
+                              color: Colors.blue
+                              font.family: Typography.icons.family
+                              font.pixelSize: 12
+                            }
+                          }
+
+                          MouseArea {
+                            id: cfgOptMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.setCardProfile(cfgCard.name, modelData.name)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            Label {
+              visible: !root.pactlReady
+              text: "Configuration unavailable"
+              color: Colors.white
+            }
+
+            Label {
+              visible: root.pactlReady && root.audioCards.length === 0
+              text: "No audio devices found"
+              color: Colors.white
             }
           }
         }
