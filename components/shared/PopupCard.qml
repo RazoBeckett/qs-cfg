@@ -1,4 +1,4 @@
-import ".."
+import "../.."
 import Quickshell
 import Quickshell.Hyprland
 import QtQuick
@@ -10,13 +10,15 @@ PopupWindow {
   required property var barWindow
   property var shell: null
   property string popoutKind: ""
-  property int margin: Config.margin
+  property int margin: 6
   property int contentWidth: 360
   property int contentHeight: 460
 
   default property alias contentItem: contentHolder.data
 
-  visible: open || contentHolder.opacity > 0
+  readonly property bool showing: open || contentHolder.opacity > 0
+
+  visible: showing
   color: Colors.transparent
   implicitWidth: contentWidth
   implicitHeight: contentHeight
@@ -92,23 +94,23 @@ PopupWindow {
     y: root.open ? 0 : -8
     opacity: root.open ? 1 : 0
     clip: true
-    // genie — when Config.genie false, behaves like normal (no distort)
+    // genie — when Settings.ui.genie false, behaves like normal (no distort)
     transform: Scale {
       id: genieScale
       origin.x: contentHolder.width * 0.88
       origin.y: 0
-      xScale: Config.genie ? (root.open ? 1 : 0.22) : 1
-      yScale: Config.genie ? (root.open ? 1 : 0.58) : 1
-      Behavior on xScale { NumberAnimation { duration: Config.genie ? 280 : 0; easing.type: Easing.InOutCubic } }
-      Behavior on yScale { NumberAnimation { duration: Config.genie ? 280 : 0; easing.type: Easing.InOutCubic } }
+      xScale: Settings.ui.genie ? (root.open ? 1 : 0.22) : 1
+      yScale: Settings.ui.genie ? (root.open ? 1 : 0.58) : 1
+      Behavior on xScale { NumberAnimation { duration: Settings.ui.genie ? 280 : 0; easing.type: Easing.InOutCubic } }
+      Behavior on yScale { NumberAnimation { duration: Settings.ui.genie ? 280 : 0; easing.type: Easing.InOutCubic } }
     }
 
     Behavior on y {
-      NumberAnimation { duration: Config.genie ? 220 : 150; easing.type: Easing.OutCubic }
+      NumberAnimation { duration: Settings.ui.genie ? 220 : 150; easing.type: Easing.OutCubic }
     }
 
     Behavior on opacity {
-      NumberAnimation { duration: Config.genie ? 200 : 120; easing.type: Easing.OutCubic }
+      NumberAnimation { duration: Settings.ui.genie ? 200 : 120; easing.type: Easing.OutCubic }
     }
   }
 }

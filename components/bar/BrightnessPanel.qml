@@ -1,4 +1,4 @@
-import ".."
+import "../.."
 import Quickshell
 import Quickshell.Io
 import QtQuick
@@ -17,14 +17,9 @@ PopupCard {
   readonly property real max: maxBrightness.loaded ? parseFloat(maxBrightness.text()) : 1
   readonly property int level: ready ? Math.round((raw / max) * 100) : 0
   readonly property string icon: {
-    if (!ready) return "brightness_4"
-    if (level <= 14) return "brightness_1"
-    if (level <= 28) return "brightness_2"
-    if (level <= 42) return "brightness_3"
-    if (level <= 57) return "brightness_4"
-    if (level <= 71) return "brightness_5"
-    if (level <= 85) return "brightness_6"
-    return "brightness_7"
+    if (!ready) return "sun"
+    if (level <= 33) return "sun-dim"
+    return "sun"
   }
   readonly property real fraction: ready ? level / 100 : 0
   readonly property var presets: [1, 25, 50, 75, 100]
@@ -66,6 +61,8 @@ PopupCard {
     color: Colors.background
     border.color: Colors.border
     border.width: 1
+    radius: Settings.rounding.lg
+    clip: true
 
     ColumnLayout {
       anchors.fill: parent
@@ -83,12 +80,12 @@ PopupCard {
         Text {
           text: root.icon
           color: Colors.foreground
-          font.family: Config.materialSymbols.family
+          font.family: Typography.icons.family
           font.pixelSize: 18
           Layout.preferredWidth: 22
         }
 
-        IOSSlider {
+        Slider {
           id: sliderRoot
           Layout.fillWidth: true
           Layout.preferredHeight: 24
@@ -97,16 +94,13 @@ PopupCard {
           trackHeight: 4
           thumbBaseWidth: 20
           thumbBaseHeight: 14
-          thumbRadius: 3
           fillColor: Colors.blue
           onMoved: f => root.setBrightnessFraction(f)
         }
 
-        Text {
+        Label {
           text: root.ready ? root.level + "%" : "-"
           color: Colors.white
-          font.pixelSize: 12
-          font.family: Config.font.family
           Layout.preferredWidth: 36
           horizontalAlignment: Text.AlignRight
         }
@@ -126,6 +120,7 @@ PopupCard {
           color: Colors.card
           border.color: Colors.blue
           border.width: 1
+          radius: Settings.rounding.sm
           Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
           Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
         }
@@ -142,17 +137,15 @@ PopupCard {
               readonly property bool isActive: root.ready && root.level === modelData
               Layout.fillWidth: true
               Layout.preferredHeight: 28
-              radius: 0
+              radius: Settings.rounding.sm
               color: (chipMa.containsMouse && !isActive) ? Colors.surface : Colors.transparent
               border.color: isActive ? Colors.transparent : Colors.border
               border.width: 1
 
-            Text {
+            Label {
               anchors.centerIn: parent
               text: modelData + "%"
               color: isActive ? Colors.blue : (chipMa.containsMouse ? Colors.foreground : Colors.white)
-              font.pixelSize: 12
-              font.family: Config.font.family
             }
 
             MouseArea {

@@ -1,4 +1,4 @@
-import ".."
+import "../.."
 import QtQuick
 import QtQuick.Layouts
 
@@ -90,6 +90,7 @@ Item {
 
           Rectangle {
             anchors.fill: parent
+            radius: Settings.rounding.xs
             color: "transparent"
             border.color: Colors.border
             border.width: 1
@@ -148,8 +149,9 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             text: modelData.label
             color: Colors.white
+            // scale-exempt: dense tick strip is 14px tall; even sizeXS overflows it
             font.pixelSize: 7
-            font.family: Config.font.family
+            font.family: Typography.sans.family
             opacity: 0.9
           }
         }

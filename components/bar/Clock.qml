@@ -1,14 +1,19 @@
-import ".."
+import "../.."
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
 
 Item {
   id: root
-  implicitWidth: row.implicitWidth + Config.moduleHPadding * 2
-  implicitHeight: Config.barHeight
+  implicitWidth: row.implicitWidth + 26
+  implicitHeight: Sizing.barHeight
 
   property string displayText: Qt.formatDateTime(clock.date, "hh:mm")
+  property var barWindow: null
+
+  readonly property string tipText: Qt.formatDateTime(clock.date, "hh:mm:ss") + "\n" + Qt.formatDateTime(clock.date, "MMM d, yyyy")
+
+  HoverHandler { id: hover }
 
   RowLayout {
     id: row
@@ -26,22 +31,22 @@ Item {
       // triggers tick when minute changes
       onPendingTextChanged: if (outgoing.text !== "" && pendingText !== outgoing.text) tickAnim.restart()
 
-      Text {
+      Label {
         id: outgoing
         anchors.centerIn: parent
         text: root.displayText
         color: Colors.foreground
-        font: Config.font
+        weight: Font.Bold
         opacity: 1
         y: 0
       }
 
-      Text {
+      Label {
         id: incoming
         anchors.centerIn: parent
         text: root.displayText
         color: Colors.foreground
-        font: Config.font
+        weight: Font.Bold
         opacity: 0
         y: 6
         visible: false
@@ -79,6 +84,14 @@ Item {
 
   SystemClock {
     id: clock
-    precision: SystemClock.Minutes
+    precision: SystemClock.Seconds
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: hover.hovered && root.barWindow !== null
+    useMono: true
   }
 }

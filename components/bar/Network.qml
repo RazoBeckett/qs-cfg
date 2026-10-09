@@ -1,8 +1,7 @@
-import ".."
+import "../.."
 import Quickshell.Networking
 import Quickshell.Widgets
 import QtQuick
-import QtQuick.Layouts
 
 WrapperMouseArea {
   id: root
@@ -11,50 +10,39 @@ WrapperMouseArea {
   acceptedButtons: Qt.LeftButton | Qt.RightButton
 
   property var shell: null
+  property var barWindow: null
   property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
   property var active: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
   readonly property real signal: active ? active.signalStrength : 0
   readonly property bool wifiOn: Networking.wifiEnabled
   readonly property bool disconnected: wifiOn && !active
   readonly property string icon: {
-    if (!wifiOn) return "signal_wifi_off"
-    if (!active) return "signal_wifi_0_bar"
+    if (!wifiOn) return "wifi-slash"
+    if (!active) return "wifi-x"
     let tier = signal >= 0.75 ? 4 : signal >= 0.50 ? 3 : signal >= 0.25 ? 2 : 1
-    if (tier === 4) return "network_wifi"
-    if (tier === 3) return "network_wifi_3_bar"
-    if (tier === 2) return "network_wifi_2_bar"
-    return "network_wifi_1_bar"
+    if (tier === 4) return "wifi-high"
+    if (tier === 3) return "wifi-medium"
+    if (tier === 2) return "wifi-low"
+    return "wifi-none"
   }
-  readonly property string label: {
-    if (!wifiOn) return "OFF"
-    if (active) return active.name
+  readonly property string tipText: {
+    if (!root.wifiOn) return "OFF"
+    if (root.active) return root.active.name
     return "Disconnected"
   }
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
-    implicitWidth: row.implicitWidth + Config.moduleHPadding * 2
-    implicitHeight: Config.barHeight
+    implicitWidth: Sizing.barHeight
+    implicitHeight: Sizing.barHeight
     pressed: root.pressed
 
-    RowLayout {
-      id: row
+    Text {
       anchors.centerIn: parent
-      spacing: 6
-
-      Text {
-        text: root.icon
-        color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
-        font.family: Config.materialSymbols.family
-        font.pixelSize: Config.iconSize
-      }
-
-      Text {
-        text: root.label
-        color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
-        font: Config.font
-        elide: Text.ElideRight
-        Layout.maximumWidth: 140
-      }
+      text: root.icon
+      color: root.disconnected ? Colors.waybarDisconnected : Colors.foreground
+      font.family: Typography.icons.family
+      font.pixelSize: 15
     }
   }
 
@@ -78,5 +66,12 @@ WrapperMouseArea {
   onClicked: mouse => {
     if (mouse.button === Qt.RightButton) root.togglePopout("bluetooth")
     else if (mouse.button === Qt.LeftButton) root.togglePopout("wifi")
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
   }
 }

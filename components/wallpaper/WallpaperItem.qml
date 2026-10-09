@@ -1,4 +1,5 @@
-import ".."
+import "../.."
+import Quickshell.Widgets
 import QtQuick
 
 Item {
@@ -51,7 +52,7 @@ Item {
     }
   }
 
-  Rectangle {
+  ClippingRectangle {
     id: thumb
 
     anchors.top: parent.top
@@ -60,9 +61,10 @@ Item {
     width: root.width
     height: root.width / 16 * 9
 
-    radius: 0
+    radius: Settings.rounding.md
 
     color: Colors.surface
+    contentUnderBorder: true
 
     border.color:
       root.isCurrent
@@ -72,8 +74,6 @@ Item {
     border.width:
       root.isCurrent ? 2 : 0
 
-    clip: true
-
     Text {
       anchors.centerIn: parent
 
@@ -82,7 +82,7 @@ Item {
       color: Colors.white
       opacity: 0.25
 
-      font.family: Config.materialSymbols.family
+      font.family: Typography.icons.family
       font.pixelSize: 28
 
       visible:
@@ -135,7 +135,7 @@ Item {
     }
   }
 
-  Text {
+  Label {
     id: label
 
     anchors.top: thumb.bottom
@@ -157,9 +157,7 @@ Item {
         ? Colors.foreground
         : Colors.white
 
-    font.family: Config.font.family
-    font.pixelSize: 12
-    font.weight: Config.font.weight
+    size: Typography.sizeSM
 
     opacity:
       root.isCurrent

@@ -6,12 +6,15 @@ declarative, and consistent with the existing bar components.
 ## Project Shape
 
 - Keep the root shell composition in `shell.qml`.
-- Keep reusable bar widgets in `components/`.
+- Keep bar widgets in `components/bar/`.
+- Keep shared primitives in `components/shared/`.
+- Keep feature clusters in their own folders (`components/settings/`, `components/wallpaper/`).
 - Keep shared UI state singletons in `states/`.
 - Keep system-truth singletons in `services/`.
 - Keep shared style and sizing values in the singleton files:
-  - `Colors.qml` for color tokens.
-  - `Config.qml` for spacing, dimensions, and fonts.
+  - `theme/Colors.qml` for color tokens.
+  - `theme/Typography.qml` for fonts, sizes, and type scale.
+  - `theme/Sizing.qml` for bar dimensions and shared layout metrics.
 - Register new public QML types in `qmldir` when they should be imported by
   name.
 - Prefer one focused component per file. A component should own one visible bar
@@ -54,26 +57,65 @@ declarative, and consistent with the existing bar components.
 - Use `RowLayout` for horizontal bar groups.
 - Use `Item { Layout.fillWidth: true }` as the flexible spacer between left and
   right bar regions.
+- Size icon-only bar pills as fixed squares (`Sizing.barHeight` by
+  `Sizing.barHeight`) with the glyph centered, never from glyph content
+  width. Glyph widths vary per icon, so content-sized pills drift and the
+  rhythm feels uneven. Text pills (battery, clock) stay content-sized.
+- Separate bar pills with `Sizing.moduleSpacing` (8). Do not invent local
+  gaps between pills.
 - Keep repeated inline spacing values small and local only when they are part of
-  a component's internal visual rhythm. Use `Config.spacing` for top-level
-  spacing between bar modules.
+  a component's internal visual rhythm.
 - Keep bar height, outer margins, fonts, and shared dimensions centralized in
-  `Config.qml`.
+  the theme singletons (`theme/Sizing.qml`, `theme/Colors.qml`,
+  `theme/Typography.qml`).
 - Avoid wrapper elements unless they provide a concrete behavior such as hover,
   wheel handling, or mouse interaction.
 
 ## Visual Design
 
 - Use `Colors` tokens instead of hard-coded colors in components.
-- Add new colors to `Colors.qml` before using them in multiple places.
-- Use `Config.font` for text labels.
-- Use `Config.iconFont` for Nerd Font icon glyphs.
+- Add new colors to `theme/Colors.qml` before using them in multiple places.
+- Use `Typography.sans` / `Typography.mono` for text (via `Label` where possible).
+- Use `Typography.icons` for glyphs.
+- Draw bar status icons at 15px. Smaller glyphs read as extra vertical air
+  inside the 30px slot.
 - Use `String.fromCodePoint(...)` for icon glyphs instead of pasting private-use
   characters directly into source files.
 - Keep component text minimal and status-oriented: percentages, short labels,
   connection names, and fallback states such as `"-"` or `"Muted"`.
+- Reveal pill details on hover with the shared `Tooltip`, not inline text.
+  Icon-only pills expose `tipText`, `tipHovered`, and `barWindow`, and
+  `shell.qml` passes `barWindow` through. Tooltip behavior follows Astryx
+  (200ms hover intent, instant hide, no arrow); visuals stay on our tokens
+  (`Colors.black` surface, `Colors.foreground` text, `Colors.border`,
+  `Settings.rounding.sm`).
 - Use color to communicate state, but keep the foreground text color stable
   unless the state itself needs emphasis.
+- Use one corner scale. `Settings.ui.rounding` (int, 0-24, default 5) is the
+  only saved value. `Settings.rounding.{lg,md,sm,xs}` derive from it by
+  phi 1.618 outside the adapter so they never persist. At default 5 that is
+  5/3/2/1. Zero stays zero at every level.
+- Assign corner levels consistently. Lg is for outer cards, popups, pills, and
+  the settings shell. Md is for tab highlights, device rows, stream cards,
+  preview boxes, wallpaper thumbs, and mid-size buttons. Sm is for small
+  controls such as 28px icon buttons, preset chips, toggle thumbs, and slider
+  tracks. Xs is for the tiniest outlines and dots. Toggle tracks default to
+  md with sm thumbs, Slider thumbs default to md with sm tracks. New code
+  names the scale at call sites instead of writing literal radii.
+- Clip what bleeds. A container whose children reach its edges (images,
+  sidebar fills, wipe previews) becomes `ClippingRectangle` with
+  `contentUnderBorder: true`. Simple cards stay `Rectangle` with `clip: true`.
+- Follow the type scale. `Typography.rootSize` follows `Settings.ui.fontScale`
+  (default 13). `sizeXS` is base * 0.85, `sizeSM` is base, `sizeMD` is
+  base * 1.15, `sizeLG` is base * 1.4. Defaults are sans `SF Pro Text`, mono
+  `JetBrains Mono`, icons `Phosphor`. Prefer `Label` with `useMono`, `size`,
+  and `weight`, and set `font.family`, `font.pixelSize`, and `font.weight`
+  individually. Never pair a grouped `font: Typography.x` binding with a
+  `font.*` override on the same item. Literal `pixelSize` is only for icon
+  glyphs or fixed-density exceptions marked `scale-exempt`.
+- Keep small text readable and pair decisions. Small text holds high contrast
+  against its background, and a new color in `Colors.qml` plus a new size in
+  `Typography.qml` is one paired decision, not two.
 
 ## Interaction
 
@@ -100,6 +142,21 @@ declarative, and consistent with the existing bar components.
 - Use `PwObjectTracker` for Pipewire objects that need tracking.
 - Use `FileView` with `watchChanges: true` when displaying state from files
   that can change externally.
+
+## Settings Persistence
+
+- Persist user preferences in `services/Settings.qml` through `FileView` with
+  `watchChanges: true` to `kettshell.json` under the shell state path.
+  Adapter initializers are the defaults and missing keys fall back to them.
+- Declare derived values on the `Settings` root beside the adapter, never
+  inside the `ui` `JsonObject`. Every property inside that object saves to
+  `kettshell.json` and reloads over its binding, so a derived value placed
+  there freezes after one restart. The rounding scale lives beside the
+  adapter for this reason.
+- Writing a `Settings` key from QML saves automatically. The settings pages,
+  rows, tabs, and full key list live in `components/settings/DOCS.md`, which
+  is the source of truth for settings UI. Settings pages import `"../.."`
+  and never import each other by path.
 
 ## Comments
 
@@ -129,17 +186,30 @@ declarative, and consistent with the existing bar components.
 
 When adding a new bar module:
 
-1. Create a focused file in `components/`.
-2. Import `".."`
-   so the component can use `Colors` and `Config`.
+1. Create a focused file in `components/bar/`, `components/shared/`, or `components/wallpaper/`.
+2. Import `".."` (or `"../.."` from a subfolder)
+   so the component can use `Colors`, `Typography`, and `Settings`.
 3. Use a small root item such as `RowLayout`, `Text`, or `WrapperMouseArea`.
+   Icon-only pills use a fixed `Sizing.barHeight` square with a centered
+   glyph; text pills size from content.
 4. Define service bindings and derived `readonly property` values near the top.
-5. Render icon and text children with `Config.iconFont` and `Config.font`.
+5. Render icon and text children with `Typography.icons` and `Typography.sans`/`Typography.mono` (or `Label`).
+   Icon-only pills show no inline text; they expose `tipText` and
+   `tipHovered` and render a `Tooltip` instead.
 6. Add fallback states for missing data.
 7. Add the component to `qmldir` if it should be imported by name.
-8. Compose it into `shell.qml` in the appropriate row.
+8. Compose it into `shell.qml` in the appropriate row, passing `barWindow`
+   when the module renders a `Tooltip` or `PopupCard`.
+
+For settings tabs and rows, follow `components/settings/DOCS.md` instead of
+this list. Editing an existing file hot reloads, while adding or renaming a
+file or touching `qmldir` needs a restart.
 
 ## Verification
 
 - use 'qmllint' to find errors and warnings.
+- Keep new `radius:` values on the `Settings.rounding` scale, with no
+  literals at new call sites.
+- Keep every touched `Text` free of `font: Typography.x` paired with a
+  `font.*` override on the same item.
 - Keep changes scoped. Avoid unrelated formatting churn in existing files.

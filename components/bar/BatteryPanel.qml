@@ -1,4 +1,4 @@
-import ".."
+import "../.."
 import Quickshell.Services.UPower
 import QtQuick
 import QtQuick.Layouts
@@ -6,8 +6,8 @@ import QtQuick.Layouts
 PopupCard {
   id: root
   popoutKind: "battery"
-  contentWidth: 360
-  contentHeight: 148
+  contentWidth: 384
+  contentHeight: 218
 
   readonly property var battery: UPower.displayDevice
   readonly property bool ready: battery != null && battery.isPresent
@@ -73,12 +73,30 @@ PopupCard {
     return ""
   }
 
-  readonly property string chargingIcon: level < 30 ? "battery_android_bolt" : "battery_android_frame_bolt"
+  readonly property string icon: {
+    if (!ready) return "battery-warning"
+    if (isPendingCharge) return "plug-charging"
+    if (isCharging) return "battery-charging"
+    if (isFullyCharged || level >= 95) return "battery-full"
+    if (level <= 15) return "battery-warning"
+    if (level >= 70) return "battery-high"
+    if (level >= 40) return "battery-medium"
+    return "battery-low"
+  }
   readonly property double energy: ready ? Number(battery.energy) : 0
   readonly property double energyCapacity: ready ? Number(battery.energyCapacity) : 0
   readonly property double rateRaw: ready ? Number(battery.changeRate) : 0
   readonly property double healthRaw: ready ? Number(battery.healthPercentage) : 0
   readonly property bool healthSupported: ready ? Boolean(battery.healthSupported) : false
+  readonly property var profiles: [
+    { profile: PowerProfile.PowerSaver, label: "Power Save", icon: "leaf" },
+    { profile: PowerProfile.Balanced, label: "Balanced", icon: "scales" },
+    { profile: PowerProfile.Performance, label: "Performance", icon: "lightning" }
+  ]
+  readonly property int activeProfileIndex: {
+    for (let i = 0; i < profiles.length; i++) if (PowerProfiles.profile === profiles[i].profile) return i
+    return -1
+  }
 
   function formatRate(v) {
     if (!ready || isNaN(v) || Math.abs(v) < 0.05) return "—"
@@ -104,102 +122,33 @@ PopupCard {
 
   Rectangle {
     id: bg
-    width: 360
-    height: 148
+    width: 384
+    height: 218
     color: Colors.background
     border.color: Colors.border
     border.width: 1
+    radius: Settings.rounding.lg
+    clip: true
 
     ColumnLayout {
       anchors.fill: parent
       anchors.leftMargin: 16
       anchors.rightMargin: 16
-      anchors.topMargin: 14
-      anchors.bottomMargin: 12
-      spacing: 10
+      anchors.topMargin: 16
+      anchors.bottomMargin: 14
+      spacing: 14
 
       RowLayout {
         Layout.fillWidth: true
         spacing: 10
 
-      // Battery icon — Win10 style. Pending shows Power icon.
-      // Charging shows single Material icon: bolt (<30) or frame_bolt (>=30).
-      // Otherwise shows outline with fill.
-      Item {
-        id: batteryIconRoot
+      Text {
+        text: root.icon
+        color: Colors.foreground
+        font.family: Typography.icons.family
+        font.pixelSize: 28
         Layout.preferredWidth: 36
-        Layout.preferredHeight: 28
         Layout.alignment: Qt.AlignVCenter
-
-        Text {
-          id: powerIcon
-          visible: root.isPendingCharge
-          anchors.centerIn: parent
-          text: "power"
-          color: Colors.foreground
-          font.family: Config.materialSymbols.family
-          font.pixelSize: 28
-        }
-
-        Text {
-          id: chargingIcon
-          visible: root.isCharging
-          anchors.centerIn: parent
-          text: root.chargingIcon
-          color: Colors.foreground
-          font.family: Config.materialSymbols.family
-          font.pixelSize: 28
-        }
-
-        Text {
-          id: fullIcon
-          visible: root.isFullyCharged
-          anchors.centerIn: parent
-          text: "battery_android_full"
-          color: Colors.foreground
-          font.family: Config.materialSymbols.family
-          font.pixelSize: 28
-        }
-
-        Item {
-          visible: !root.isPendingCharge && !root.isCharging && !root.isFullyCharged
-          anchors.centerIn: parent
-          width: 40
-          height: 22
-
-          Rectangle {
-            id: outline
-            anchors.fill: parent
-            anchors.rightMargin: 3
-            radius: 2
-            color: "transparent"
-            border.color: Colors.foreground
-            border.width: 1.6
-
-            Rectangle {
-              id: fill
-              anchors.left: parent.left
-              anchors.leftMargin: 2
-              anchors.verticalCenter: parent.verticalCenter
-              height: parent.height - 4
-              width: Math.max(0, Math.round((parent.width - 4) * root.fraction))
-              radius: 1
-              color: root.level <= 15 && !root.isFullyCharged ? Colors.waybarCriticalBg : Colors.foreground
-              visible: root.ready && root.level > 0
-            }
-          }
-
-          Rectangle {
-            id: nub
-            width: 3
-            height: 10
-            radius: 1
-            color: Colors.foreground
-            anchors.left: outline.right
-            anchors.leftMargin: -1
-            anchors.verticalCenter: parent.verticalCenter
-          }
-        }
       }
 
       // Percentage — large thin number like Win10
@@ -207,7 +156,8 @@ PopupCard {
         id: percentText
         text: root.ready ? root.level + "%" : "--"
         color: Colors.foreground
-        font.family: Config.font.family
+        font.family: Typography.mono.family
+        // scale-exempt: hero numeral pinned to this fixed 360x148 card; the text scale tops out at sizeLG
         font.pixelSize: 32
         font.weight: Font.Light
         font.letterSpacing: -0.5
@@ -222,26 +172,20 @@ PopupCard {
         Layout.alignment: Qt.AlignVCenter
         spacing: 2
 
-        Text {
+        Label {
           id: line1
           text: root.statusLine1
           color: root.isFullyCharged ? Colors.white : Colors.foreground
-          font.family: Config.font.family
-          font.pixelSize: 13
-          font.weight: Font.Normal
           elide: Text.ElideRight
           Layout.fillWidth: true
           horizontalAlignment: Text.AlignRight
           opacity: root.ready ? 0.92 : 0.5
         }
 
-        Text {
+        Label {
           id: line2
           text: root.statusLine2
           color: Colors.white
-          font.family: Config.font.family
-          font.pixelSize: 13
-          font.weight: Font.Normal
           elide: Text.ElideRight
           Layout.fillWidth: true
           horizontalAlignment: Text.AlignRight
@@ -259,7 +203,7 @@ PopupCard {
         Rectangle {
           id: energyTrack
           anchors.fill: parent
-          radius: 3
+          radius: Settings.rounding.md
           color: Colors.card
         }
 
@@ -270,7 +214,7 @@ PopupCard {
           anchors.verticalCenter: energyTrack.verticalCenter
           height: energyTrack.height + 10
           width: energyFill.width
-          radius: 6
+          radius: Settings.rounding.lg
           color: Colors.waybarCharging
           opacity: 0.18
           z: -1
@@ -282,7 +226,7 @@ PopupCard {
           anchors.left: energyTrack.left
           anchors.verticalCenter: energyTrack.verticalCenter
           height: energyTrack.height
-          radius: 3
+          radius: Settings.rounding.md
           width: Math.max(energyTrack.height, Math.round(energyTrack.width * root.fraction))
           color: root.isCharging ? Colors.waybarCharging : root.level <= 15 && !root.isFullyCharged ? Colors.waybarCriticalBg : Colors.foreground
           transformOrigin: Item.Left
@@ -312,6 +256,81 @@ PopupCard {
         }
       }
 
+      // Power profiles via the native PowerProfiles service; Performance dims when unsupported
+      Rectangle {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 44
+        radius: Settings.rounding.md
+        color: Colors.transparent
+        border.color: Colors.border
+        border.width: 1
+
+        Rectangle {
+          id: profileHighlight
+          visible: root.activeProfileIndex >= 0
+          width: (parent.width - 20) / 3
+          height: 32
+          x: 6 + root.activeProfileIndex * (width + 4)
+          y: 6
+          color: Colors.card
+          border.color: Colors.blue
+          border.width: 1
+          radius: Settings.rounding.sm
+          Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+          Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+        }
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: 6
+          anchors.rightMargin: 6
+          anchors.topMargin: 6
+          anchors.bottomMargin: 6
+          spacing: 4
+
+          Repeater {
+            model: root.profiles
+            delegate: Rectangle {
+              id: chip
+              required property var modelData
+              readonly property bool isActive: PowerProfiles.profile === modelData.profile
+              readonly property bool isUnavailable: modelData.profile === PowerProfile.Performance && !PowerProfiles.hasPerformanceProfile
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              radius: Settings.rounding.sm
+              color: chipMa.pressed ? Colors.card : (chipMa.containsMouse && !isActive) ? Colors.surface : Colors.transparent
+              opacity: isUnavailable ? 0.4 : 1
+
+              RowLayout {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                  text: chip.modelData.icon
+                  color: chip.isActive ? Colors.blue : Colors.white
+                  font.family: Typography.icons.family
+                  font.pixelSize: 15
+                }
+
+                Label {
+                  text: chip.modelData.label
+                  color: chip.isActive ? Colors.blue : (chipMa.containsMouse ? Colors.foreground : Colors.white)
+                }
+              }
+
+              MouseArea {
+                id: chipMa
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                enabled: !chip.isUnavailable
+                onClicked: PowerProfiles.profile = chip.modelData.profile
+              }
+            }
+          }
+        }
+      }
+
       // Details row: energy · rate · health
       RowLayout {
         Layout.fillWidth: true
@@ -320,20 +339,17 @@ PopupCard {
         ColumnLayout {
           Layout.fillWidth: true
           spacing: 2
-          Text {
+          Label {
             text: "Energy"
             color: Colors.white
-            font.family: Config.font.family
-            font.pixelSize: 10
+            size: Typography.sizeXS
             opacity: 0.55
             elide: Text.ElideRight
             Layout.fillWidth: true
           }
-          Text {
+          Label {
             text: root.energyLabel
             color: Colors.foreground
-            font.family: Config.font.family
-            font.pixelSize: 12
             elide: Text.ElideRight
             Layout.fillWidth: true
           }
@@ -342,21 +358,18 @@ PopupCard {
         ColumnLayout {
           Layout.fillWidth: true
           spacing: 2
-          Text {
+          Label {
             text: "Power"
             color: Colors.white
-            font.family: Config.font.family
-            font.pixelSize: 10
+            size: Typography.sizeXS
             opacity: 0.55
             elide: Text.ElideRight
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
           }
-          Text {
+          Label {
             text: root.rateLabel
             color: root.isCharging ? Colors.waybarCharging : Colors.foreground
-            font.family: Config.font.family
-            font.pixelSize: 12
             elide: Text.ElideRight
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
@@ -366,21 +379,18 @@ PopupCard {
         ColumnLayout {
           Layout.fillWidth: true
           spacing: 2
-          Text {
+          Label {
             text: "Health"
             color: Colors.white
-            font.family: Config.font.family
-            font.pixelSize: 10
+            size: Typography.sizeXS
             opacity: 0.55
             elide: Text.ElideRight
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignRight
           }
-          Text {
+          Label {
             text: root.healthLabel
             color: Colors.foreground
-            font.family: Config.font.family
-            font.pixelSize: 12
             elide: Text.ElideRight
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignRight

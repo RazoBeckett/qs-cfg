@@ -1,13 +1,39 @@
-Brightness 1.0 Brightness.qml
-Clock 1.0 Clock.qml
+Battery 1.0 components/bar/Battery.qml
+BatteryPanel 1.0 components/bar/BatteryPanel.qml
+BluetoothPanel 1.0 components/bar/BluetoothPanel.qml
+Brightness 1.0 components/bar/Brightness.qml
+BrightnessPanel 1.0 components/bar/BrightnessPanel.qml
+Clock 1.0 components/bar/Clock.qml
+Network 1.0 components/bar/Network.qml
+Volume 1.0 components/bar/Volume.qml
+VolumePanel 1.0 components/bar/VolumePanel.qml
+WifiPanel 1.0 components/bar/WifiPanel.qml
+Workspaces 1.0 components/bar/Workspaces.qml
 singleton NetworkMenuState 1.0 states/NetworkMenuState.qml
 singleton BluetoothMenuState 1.0 states/BluetoothMenuState.qml
-Workspaces 1.0 Workspaces.qml
-singleton Colors 1.0 Colors.qml
-singleton Config 1.0 Config.qml
+singleton Colors 1.0 theme/Colors.qml
+singleton Typography 1.0 theme/Typography.qml
+singleton Sizing 1.0 theme/Sizing.qml
+singleton Settings 1.0 services/Settings.qml
 singleton Wallpapers 1.0 services/Wallpapers.qml
-HoldCard 1.0 components/HoldCard.qml
-Pill 1.0 components/Pill.qml
-PopupCard 1.0 components/PopupCard.qml
-IOSSlider 1.0 components/IOSSlider.qml
-PressableItem 1.0 components/PressableItem.qml
+PopupCard 1.0 components/shared/PopupCard.qml
+Toggle 1.0 components/shared/Toggle.qml
+Slider 1.0 components/shared/Slider.qml
+Label 1.0 components/shared/Label.qml
+PressableItem 1.0 components/shared/PressableItem.qml
+ObsMeter 1.0 components/shared/ObsMeter.qml
+Tooltip 1.0 components/shared/Tooltip.qml
+SegmentedControl 1.0 components/shared/SegmentedControl.qml
+WallpaperPicker 1.0 components/wallpaper/WallpaperPicker.qml
+WallpaperItem 1.0 components/wallpaper/WallpaperItem.qml
+SettingsWindow 1.0 components/settings/SettingsWindow.qml
+SettingsMenu 1.0 components/settings/SettingsMenu.qml
+SettingsRow 1.0 components/settings/SettingsRow.qml
+UiTab 1.0 components/settings/UiTab.qml
+WallpaperTab 1.0 components/settings/WallpaperTab.qml
+AboutTab 1.0 components/settings/AboutTab.qml
+FontsTab 1.0 components/settings/FontsTab.qml
+singleton Dictation 1.0 services/Dictation.qml
+BarVisualizer 1.0 components/dictation/BarVisualizer.qml
+DictationOsd 1.0 components/dictation/DictationOsd.qml
+AITab 1.0 components/settings/AITab.qml

@@ -1,8 +1,7 @@
-import ".."
+import "../.."
 import Quickshell.Services.Pipewire
 import Quickshell.Widgets
 import QtQuick
-import QtQuick.Layouts
 
 WrapperMouseArea {
   id: root
@@ -11,44 +10,36 @@ WrapperMouseArea {
   cursorShape: Qt.PointingHandCursor
 
   property var shell: null
+  property var barWindow: null
 
   property var sink: Pipewire.defaultAudioSink
   readonly property bool ready: sink && sink.ready
   readonly property bool muted: ready && sink.audio.muted
   readonly property int vol: ready ? Math.round(sink.audio.volume * 100) : 0
   readonly property string icon: {
-    if (!ready) return "volume_off"
-    if (muted || vol === 0) return "volume_off"
-    if (vol < 34) return "volume_down"
-    return "volume_up"
+    if (!ready) return "speaker-slash"
+    if (muted || vol === 0) return "speaker-slash"
+    if (vol < 34) return "speaker-low"
+    return "speaker-high"
   }
+  readonly property string tipText: {
+    if (!root.ready) return "-"
+    if (root.muted) return "Muted"
+    return root.vol + "%"
+  }
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
-    implicitWidth: row.implicitWidth + Config.moduleHPadding * 2
-    implicitHeight: Config.barHeight
+    implicitWidth: Sizing.barHeight
+    implicitHeight: Sizing.barHeight
     pressed: root.pressed
 
-    RowLayout {
-      id: row
+    Text {
       anchors.centerIn: parent
-      spacing: 6
-
-      Text {
-        text: root.icon
-        color: Colors.foreground
-        font.family: Config.materialSymbols.family
-        font.pixelSize: Config.iconSize
-      }
-
-      Text {
-        text: {
-          if (!root.ready) return "-"
-          if (root.muted) return "00%"
-          return root.vol + "%"
-        }
-        color: Colors.foreground
-        font: Config.font
-      }
+      text: root.icon
+      color: Colors.foreground
+      font.family: Typography.icons.family
+      font.pixelSize: 15
     }
   }
 
@@ -79,5 +70,13 @@ WrapperMouseArea {
 
   PwObjectTracker {
     objects: [root.sink]
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
+    useMono: true
   }
 }

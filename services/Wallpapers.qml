@@ -9,10 +9,10 @@ Singleton {
   id: root
 
   readonly property string expandedWallDir: {
-    let p = Config.wallDir
+    let p = Settings.wallpaper.directory
 
-    if (!p || p.length === 0)
-      p = "~/Pictures/Wallpapers/MyWallpapers/"
+    if (!p || p.trim().length === 0)
+      return ""
 
     let home = Quickshell.env("HOME") || ""
 
@@ -26,11 +26,36 @@ Singleton {
     return p
   }
 
-  readonly property string statePath: Quickshell.statePath("wallpaper-path.txt")
+  // Specific state for the wallpaper directory. Used to drive error messages
+  // instead of a silent hardcoded fallback. Values: "empty" | "missing" | "notADir" | "noPerm" | "ok"
+  // Start optimistic ("ok"/"empty") to avoid flashing red before the sh check completes.
+  property string directoryState: expandedWallDir === "" ? "empty" : "ok"
+  readonly property bool directoryExists: directoryState === "ok"
+
+  // POSIX sh validation — no bashisms. Reports why the path is broken.
+  // expandedWallDir always ends with "/", so strip it before testing
+  // otherwise a file like "/a/b.jpg/" tests as "missing" not "notADir".
+  Process {
+    id: dirCheckProc
+    command: [
+      "sh", "-c",
+      'p="$1"; p=${p%/}; if [ -z "$p" ]; then echo empty; elif [ ! -e "$p" ]; then echo missing; elif [ ! -d "$p" ]; then echo notADir; elif [ ! -r "$p" ] || [ ! -x "$p" ]; then echo noPerm; else echo ok; fi',
+      "sh",
+      root.expandedWallDir
+    ]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        let s = (text || "").trim()
+        if (s === "empty" || s === "missing" || s === "notADir" || s === "noPerm" || s === "ok") root.directoryState = s
+        else root.directoryState = "missing"
+      }
+    }
+  }
 
   property list<string> all: []
   property var allLower: []
-  property string current: ""
+
+  readonly property string current: Settings.wallpaper.current
 
   function fileName(path: string): string {
     let i = path.lastIndexOf("/")
@@ -93,8 +118,7 @@ Singleton {
     if (!path)
       return
 
-    current = path
-    stateFile.setText(path)
+    Settings.wallpaper.current = path
   }
 
   function refresh(): void {
@@ -102,46 +126,17 @@ Singleton {
   }
 
   /*
-   * Load the current wallpaper from the state file.
-   */
-  FileView {
-    id: stateFile
-
-    path: root.statePath
-
-    watchChanges: true
-    printErrors: false
-
-    onFileChanged: reload()
-
-    onLoaded: {
-      let t = text().trim()
-
-      if (t.length > 0) {
-        root.current = t
-      } else if (root.all.length > 0) {
-        root.current = root.all[0]
-      }
-    }
-
-    onLoadFailed: {
-      if (root.all.length > 0)
-        root.current = root.all[0]
-    }
-  }
-
-  /*
-   * Fallback when the state file has not loaded yet.
+   * Default to the first wallpaper when none is selected yet.
    */
   onAllChanged: {
     let lower = []
     for (let i = 0; i < all.length; i++) lower.push(fileName(all[i]).toLowerCase())
     allLower = lower
     if (
-      !root.current &&
+      !Settings.wallpaper.current &&
       root.all.length > 0
     ) {
-      root.current = root.all[0]
+      Settings.wallpaper.current = root.all[0]
     }
   }
 
@@ -151,9 +146,9 @@ Singleton {
   Process {
     id: listProc
 
-    // Directory comes in as $1 so bash never re-parses its content.
+    // Directory comes in as $1 so sh never re-parses its content.
     command: [
-      "bash",
+      "sh",
       "-c",
       "dir=\"$1\"; " +
         "[ -d \"$dir\" ] || exit 0; " +
@@ -192,10 +187,20 @@ Singleton {
     }
   }
 
+  Component.onCompleted: {
+    if (root.expandedWallDir === "") root.directoryState = "empty"
+    else dirCheckProc.running = true
+  }
+
   /*
-   * Re-list when Config.wallDir changes.
+   * Re-check and re-list when the wallpaper directory changes.
    */
   onExpandedWallDirChanged: {
+    if (root.expandedWallDir === "") {
+      root.directoryState = "empty"
+    } else {
+      dirCheckProc.running = true
+    }
     Qt.callLater(() => {
       listProc.running = true
     })

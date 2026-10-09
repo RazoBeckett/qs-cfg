@@ -1,4 +1,4 @@
-import ".."
+import "../.."
 import Quickshell
 import Quickshell.Hyprland
 import QtQuick
@@ -7,7 +7,7 @@ import QtQuick.Layouts
 Item {
   id: root
   implicitWidth: layout.implicitWidth
-  implicitHeight: Config.barHeight
+  implicitHeight: Sizing.barHeight
 
   readonly property var sortedWorkspaces: [...Hyprland.workspaces.values].sort((a, b) => a.id - b.id)
   readonly property int focusedId: Hyprland.focusedWorkspace?.id ?? -1
@@ -71,7 +71,7 @@ Item {
         property bool isHovered: ma.containsMouse
 
         implicitWidth: label.implicitWidth + 18
-        implicitHeight: Config.barHeight
+        implicitHeight: Sizing.barHeight
         property alias pop: popAnim
 
         SequentialAnimation {
@@ -80,12 +80,12 @@ Item {
           NumberAnimation { target: label; property: "scale"; to: 1; duration: 130; easing.type: Easing.OutCubic }
         }
 
-        Text {
+        Label {
           id: label
           anchors.centerIn: parent
           text: wsButton.ws.id
           color: wsButton.isActive ? Colors.waybarActive : Colors.foreground
-          font: Config.font
+          weight: Font.Bold
           transformOrigin: Item.Center
           scale: 1
           Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutCubic } }
@@ -104,6 +104,7 @@ Item {
 
         Rectangle {
           anchors.fill: parent
+          radius: Settings.rounding.sm
           color: Colors.waybarHover
           opacity: wsButton.isHovered ? 1 : 0
           z: -1

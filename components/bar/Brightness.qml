@@ -1,9 +1,8 @@
-import ".."
+import "../.."
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import QtQuick
-import QtQuick.Layouts
 
 WrapperMouseArea {
   id: root
@@ -12,6 +11,7 @@ WrapperMouseArea {
   cursorShape: Qt.PointingHandCursor
 
   property var shell: null
+  property var barWindow: null
 
   property string device: "intel_backlight"
   readonly property string dir: `/sys/class/backlight/${device}`
@@ -20,38 +20,24 @@ WrapperMouseArea {
   readonly property real max: maxBrightness.loaded ? parseFloat(maxBrightness.text()) : 1
   readonly property int level: ready ? Math.round((raw / max) * 100) : 0
   readonly property string icon: {
-    if (!ready) return "brightness_4"
-    if (level <= 14) return "brightness_1"
-    if (level <= 28) return "brightness_2"
-    if (level <= 42) return "brightness_3"
-    if (level <= 57) return "brightness_4"
-    if (level <= 71) return "brightness_5"
-    if (level <= 85) return "brightness_6"
-    return "brightness_7"
+    if (!ready) return "sun"
+    if (level <= 33) return "sun-dim"
+    return "sun"
   }
+  readonly property string tipText: root.ready ? root.level + "%" : "-"
+  readonly property bool tipHovered: root.containsMouse && !(root.shell && root.shell.activePopoutOwner === root)
 
   child: PressableItem {
-    implicitWidth: row.implicitWidth + Config.moduleHPadding * 2
-    implicitHeight: Config.barHeight
+    implicitWidth: Sizing.barHeight
+    implicitHeight: Sizing.barHeight
     pressed: root.pressed
 
-    RowLayout {
-      id: row
+    Text {
       anchors.centerIn: parent
-      spacing: 6
-
-      Text {
-        text: root.icon
-        color: Colors.foreground
-        font.family: Config.materialSymbols.family
-        font.pixelSize: Config.iconSize
-      }
-
-      Text {
-        text: root.ready ? root.level + "%" : "-"
-        color: Colors.foreground
-        font: Config.font
-      }
+      text: root.icon
+      color: Colors.foreground
+      font.family: Typography.icons.family
+      font.pixelSize: 15
     }
   }
 
@@ -82,5 +68,13 @@ WrapperMouseArea {
   FileView {
     id: maxBrightness
     path: `${root.dir}/max_brightness`
+  }
+
+  Tooltip {
+    anchorItem: root
+    barWindow: root.barWindow
+    text: root.tipText
+    hovered: root.tipHovered && root.barWindow !== null
+    useMono: true
   }
 }

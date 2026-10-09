@@ -29,7 +29,7 @@ Scope {
 
       // awww wipe — angle from Config, like `awww --transition-type wipe --transition-angle 30`
       // (awww maps Right→0, Top→90, Left→180, Bottom→270)
-      readonly property int deg: Config.wallWipeDeg
+      readonly property int deg: Settings.wallpaper.wipeDeg
       property string stableSource: ""
       property string pendingSource: ""
       readonly property bool hasPending: pendingSource !== ""
